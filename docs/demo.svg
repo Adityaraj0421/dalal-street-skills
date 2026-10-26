@@ -1,27 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="860" height="578" viewBox="0 0 860 578" role="img" aria-label="India Trader demo: a RELIANCE breakout planned, replayed 10,000 times and skipped">
-<rect width="860" height="578" rx="10" fill="#0d1117"/>
-<rect width="860" height="34" rx="10" fill="#161b22"/><rect y="24" width="860" height="10" fill="#161b22"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="556" viewBox="0 0 900 556" role="img" aria-label="India Trader demo: a live Nifty 500 scan, then TCS and HCLTECH breakouts planned, replayed 10,000 times and skipped">
+<rect width="900" height="556" rx="10" fill="#0d1117"/>
+<rect width="900" height="34" rx="10" fill="#161b22"/><rect y="24" width="900" height="10" fill="#161b22"/>
 <circle cx="20" cy="17" r="6" fill="#ff5f57"/>
 <circle cx="40" cy="17" r="6" fill="#febc2e"/>
 <circle cx="60" cy="17" r="6" fill="#28c840"/>
-<text x="430" y="22" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" text-anchor="middle">claude  —  india-trader</text>
-<text x="22" y="72" fill="#7dd3fc" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve" font-weight="700">&gt; /nse-entry RELIANCE</text>
-<text x="22" y="94" fill="#4ade80" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">TRIGGERED 10:00 AM at ₹1,193.60: the 9:55 bar closed above the range high ₹1,192.00</text>
-<text x="22" y="116" fill="#fbbf24" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">Closing auction: F&amp;O stock, continuous trading ends 15:15. Last new entry 14:30.</text>
-<text x="22" y="160" fill="#7dd3fc" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve" font-weight="700">&gt; /nse-exit</text>
-<text x="22" y="182" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">  Entry         ₹1,193.60 at 10:00 AM</text>
-<text x="22" y="204" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">  Stop          ₹1,183.65  opening-range midpoint</text>
-<text x="22" y="226" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">  Target        ₹1,213.50  2R</text>
-<text x="22" y="248" fill="#f0f6fc" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve" font-weight="700">  Reward:risk   2.0 before charges, 1.75 after</text>
-<text x="22" y="270" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">  Charges       ₹89.27 at the stop (brokerage, STT, exchange, SEBI, stamp, GST)</text>
-<text x="22" y="292" fill="#fbbf24" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">  Flat by       15:07 IST   (Zerodha squares off F&amp;O MIS at 15:12)</text>
-<text x="22" y="336" fill="#7dd3fc" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve" font-weight="700">&gt; /nse-timemachine</text>
-<text x="22" y="358" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">10,000 replays from RELIANCE's own last 58 sessions, out by 15:05</text>
-<text x="22" y="380" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">  target first   2.2 %</text>
-<text x="22" y="402" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">  stop first    30.2 %</text>
-<text x="22" y="424" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">  neither       67.6 %</text>
-<text x="22" y="446" fill="#f87171" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">  Average R: -0.164 (net of charges)</text>
-<text x="22" y="468" fill="#f87171" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">Strongly toward the stop: after charges the 2R target needs to come first in</text>
-<text x="22" y="490" fill="#f87171" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">36 % of decided replays; it did in 7 %.</text>
-<text x="22" y="534" fill="#f0f6fc" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve" font-weight="700">Skip this one. Nothing was placed.</text>
+<text x="450" y="22" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" text-anchor="middle">claude  —  india-trader</text>
+<text x="22" y="72" fill="#7dd3fc" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve" font-weight="700">&gt; Scan the Nifty 500 for breakouts</text>
+<text x="22" y="94" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">499 of 501 charts: 5 twenty-day breakouts, 12 bull flags, 172 opening-range breaks by 11:41</text>
+<text x="22" y="116" fill="#4ade80" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">On both lists: TCS  INFY  HCLTECH  COFORGE  PERSISTENT  MPHASIS  TATAELXSI  ...</text>
+<text x="22" y="160" fill="#7dd3fc" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve" font-weight="700">&gt; run for tcs and hcltech</text>
+<text x="22" y="182" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">news   TCS ₹2,520.80 -0.36%   HCLTECH ₹1,414.80 -0.52%   (21 loose headlines hidden)</text>
+<text x="22" y="204" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">       "Tata Consultancy Services Stock Update: Shares Dip Amid IT Sector Concerns"</text>
+<text x="22" y="226" fill="#4ade80" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">entry  TCS TRIGGERED 9:55 AM at ₹2,533.20    HCLTECH TRIGGERED 10:10 AM at ₹1,415.20</text>
+<text x="22" y="248" fill="#fbbf24" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">       F&amp;O stocks: continuous trading ends 15:15 (closing auction). Last new entry 14:30.</text>
+<text x="22" y="270" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">exit   TCS     stop ₹2,510.05  target ₹2,579.50</text>
+<text x="22" y="292" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">       HCLTECH stop ₹1,401.80  target ₹1,442.00</text>
+<text x="22" y="314" fill="#f0f6fc" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve" font-weight="700">       Reward:risk 2.0 before charges, 1.76 after (₹85.57 of STT, brokerage, GST... at the stop)</text>
+<text x="22" y="336" fill="#fbbf24" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">       Flat by 15:07 IST: Zerodha squares off F&amp;O MIS at 15:12</text>
+<text x="22" y="380" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">time machine, 10,000 replays each     target first   stop first   average R after charges</text>
+<text x="22" y="402" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">       TCS                                 4.3 %        47.3 %        -0.33</text>
+<text x="22" y="424" fill="#d1d7e0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">       HCLTECH                             4.3 %        45.0 %        -0.30</text>
+<text x="22" y="446" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">       Same rule on the last 58 sessions: TCS -0.22R, HCLTECH -0.31R</text>
+<text x="22" y="468" fill="#f87171" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">       Strongly toward the stop on both.</text>
+<text x="22" y="512" fill="#f0f6fc" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve" font-weight="700">Skip both. Nothing was placed.</text>
 </svg>

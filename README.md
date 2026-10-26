@@ -9,9 +9,9 @@
 ![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)
 ![paper by default](https://img.shields.io/badge/orders-paper%20by%20default-orange)
 
-<p align="center"><img src="docs/demo.svg" alt="A RELIANCE breakout planned with /nse-exit, replayed 10,000 times with /nse-timemachine, and skipped" width="860"></p>
+<p align="center"><img src="docs/demo.svg" alt="A live Nifty 500 scan, then TCS and HCLTECH breakouts planned with /nse-exit, replayed 10,000 times with /nse-timemachine, and skipped" width="900"></p>
 
-That's a real run (RELIANCE, 26 Oct 2026, from the test fixtures). The breakout triggered and the plan looked like a clean 2:1. After ₹89 of charges it was 1.75:1. Because RELIANCE is an F&O stock, its continuous trading ends at 3:15 and Zerodha squares it off at 3:12. Ten thousand replays from its own last 58 sessions said the stop comes first. **The best trade is often the one the tools talk you out of.**
+That's a real session from Monday 26 Oct 2026, 11:38 to 11:49 IST, in paper mode with Zerodha. The Nifty 500 scan put TCS and HCLTECH on both the daily-breakout and opening-range lists, and both triggered. On paper each was a clean 2:1. After charges it was 1.76:1. As F&O stocks, both stop continuous trading at 3:15 for the closing auction, and Zerodha squares them off at 3:12. Ten thousand replays each from their own last 58 sessions said the stop comes first, and the same rule had lost money on both. **The best trade is often the one the tools talk you out of.**
 
 Eleven [Claude Code](https://claude.com/claude-code) skills, plain Python, no API keys, nothing to `pip install`.
 
