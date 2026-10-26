@@ -96,7 +96,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-UA = "Mozilla/5.0 (compatible; india-trader-skill/1.0)"
+UA = "Mozilla/5.0 (compatible; dalal-street-skills/1.0)"
 HOSTS = ("query2", "query1")
 BACKOFF = 5.0
 EPOCH = datetime.datetime(1970, 1, 1)

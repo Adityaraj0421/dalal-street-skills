@@ -1,15 +1,15 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "india-trader",
+  "name": "dalal-street-skills",
   "description": "Claude skills for Indian stock markets (NSE/BSE)",
   "owner": {"name": "Aditya Raj", "url": "https://github.com/Adityaraj0421"},
   "plugins": [
     {
-      "name": "india-trader",
+      "name": "dalal-street-skills",
       "description": "11 Claude skills for trading and investing on NSE and BSE, paper by default.",
       "source": "./",
       "category": "productivity",
-      "homepage": "https://github.com/Adityaraj0421/india-trader"
+      "homepage": "https://github.com/Adityaraj0421/dalal-street-skills"
     }
   ]
 }

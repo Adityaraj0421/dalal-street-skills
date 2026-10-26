@@ -44,13 +44,13 @@ W, LH, PAD, TOP = 900, 22, 22, 50
 def render():
     h = TOP + PAD + LH * len(LINES) + PAD
     out = ['<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" '
-           'aria-label="India Trader demo: a live Nifty 500 scan, then TCS and HCLTECH breakouts planned, replayed 10,000 times and skipped">' % (W, h, W, h),
+           'aria-label="Dalal Street Skills demo: a live Nifty 500 scan, then TCS and HCLTECH breakouts planned, replayed 10,000 times and skipped">' % (W, h, W, h),
            '<rect width="%d" height="%d" rx="10" fill="#0d1117"/>' % (W, h),
            '<rect width="%d" height="34" rx="10" fill="#161b22"/><rect y="24" width="%d" height="10" fill="#161b22"/>' % (W, W)]
     for i, c in enumerate(("#ff5f57", "#febc2e", "#28c840")):
         out.append('<circle cx="%d" cy="17" r="6" fill="%s"/>' % (20 + i * 20, c))
     out.append('<text x="%d" y="22" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" '
-               'font-size="13" text-anchor="middle">claude  —  india-trader</text>' % (W // 2))
+               'font-size="13" text-anchor="middle">claude  —  dalal-street-skills</text>' % (W // 2))
     y = TOP + PAD
     for text, st in LINES:
         if text:

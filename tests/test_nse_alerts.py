@@ -17,7 +17,7 @@ alerts = load("nse-alerts", "alerts")
 QDIR = os.path.join(FIX, "nse-alerts")     # Yahoo chart JSON fetched 2026-10-26 10:37 IST, plus a sec_list.csv excerpt
 PLAN = os.path.join(QDIR, "plan-reliance.json")
 DT = datetime.datetime
-UA = "Mozilla/5.0 (compatible; india-trader-skill/1.0)"
+UA = "Mozilla/5.0 (compatible; dalal-street-skills/1.0)"
 MUHURAT = {"open": datetime.time(18, 0), "close": datetime.time(19, 0), "name": "Muhurat trading"}
 
 

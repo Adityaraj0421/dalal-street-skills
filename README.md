@@ -1,8 +1,8 @@
-# India Trader: Claude skills for NSE & BSE
+# Dalal Street Skills: Claude skills for NSE & BSE
 
 **Scan, plan, replay and size every Indian trade before a rupee moves. STT, stamp duty, circuit bands, your broker's square-off and the 3:15 closing auction are all built in.**
 
-[![tests](https://github.com/Adityaraj0421/india-trader/actions/workflows/tests.yml/badge.svg)](https://github.com/Adityaraj0421/india-trader/actions/workflows/tests.yml)
+[![tests](https://github.com/Adityaraj0421/dalal-street-skills/actions/workflows/tests.yml/badge.svg)](https://github.com/Adityaraj0421/dalal-street-skills/actions/workflows/tests.yml)
 ![526 offline tests](https://img.shields.io/badge/tests-526%20offline-brightgreen)
 ![python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)
 ![stdlib only](https://img.shields.io/badge/dependencies-none-blue)
@@ -20,15 +20,15 @@ Eleven [Claude Code](https://claude.com/claude-code) skills, plain Python, no AP
 In Claude Code:
 
 ```
-/plugin marketplace add Adityaraj0421/india-trader
-/plugin install india-trader@india-trader
+/plugin marketplace add Adityaraj0421/dalal-street-skills
+/plugin install dalal-street-skills@dalal-street-skills
 ```
 
 Or copy the folders so the commands are plain `/nse-scanner`:
 
 ```bash
-git clone https://github.com/Adityaraj0421/india-trader.git
-cp -r india-trader/nse-* ~/.claude/skills/
+git clone https://github.com/Adityaraj0421/dalal-street-skills.git
+cp -r dalal-street-skills/nse-* ~/.claude/skills/
 ```
 
 Then ask Claude things like:

@@ -1,6 +1,6 @@
 # Architecture and contributor rules
 
-India Trader is 11 Claude skills (`nse-*`), each a standalone folder with a
+Dalal Street Skills is 11 Claude skills (`nse-*`), each a standalone folder with a
 `SKILL.md` and one Python script, standard library only, Python 3.8+. It began
 as a port of Jake Schincariol's US [day-trader-skill](https://github.com/Jakeschincariol/day-trader-skill)
 (MIT) to Indian equity markets (NSE and BSE). This page is the contract every
@@ -163,7 +163,7 @@ Indian fact forces a change (then add the field, e.g. `product`, `exchange`).
 - `nse-<name>/SKILL.md` + script, frontmatter `name` and a trigger-rich
   `description` in the US style but Indian (RELIANCE, TCS, Nifty, ₹, MIS/CNC).
 - Offline tests pass with `py -m unittest discover -s tests -p "test_<name>.py"`
-  run from `india-trader-skill/`.
+  run from the repo root.
 - One live smoke run of the script against today's real data, output checked.
 - No US leftovers: grep your files for `NYSE`, `New York`, `ET`, `$`, `SEC`,
   `Alpaca`, `trader/` and fix each hit (except deliberate mentions).

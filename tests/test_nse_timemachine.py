@@ -692,7 +692,7 @@ class Network(unittest.TestCase):
         self.assertEqual(tm.chart_path("RELIANCE.NS", "60d", "5m"),
                          "/v8/finance/chart/RELIANCE.NS?range=60d&interval=5m")
         self.assertIn("/chart/M%26M.NS?", tm.chart_path("M&M.NS", "60d", "5m"))     # & must be escaped
-        self.assertEqual(tm.UA, "Mozilla/5.0 (compatible; india-trader-skill/1.0)")
+        self.assertEqual(tm.UA, "Mozilla/5.0 (compatible; dalal-street-skills/1.0)")
         f = self.net([200])
         self.assertEqual(tm.fetch_chart("RELIANCE.NS"), TEXT)
         self.assertEqual(f.calls, ["https://query2.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?range=60d&interval=5m"])
