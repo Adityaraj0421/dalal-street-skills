@@ -1,0 +1,62 @@
+{
+  "created_by": "nse-exit",
+  "symbol": "RELIANCE",
+  "exchange": "NSE",
+  "yahoo": "RELIANCE.NS",
+  "product": "MIS",
+  "side": "buy",
+  "date": "2026-10-26",
+  "setup": "orb",
+  "entry": 1193.6,
+  "entry_time": "10:00 AM",
+  "entry_bar": null,
+  "interval": "5m",
+  "opening_range": {
+    "high": 1192.0,
+    "low": 1175.3,
+    "minutes": 15
+  },
+  "stop": 1183.65,
+  "stop_rule": "or_mid",
+  "stop_label": "opening-range midpoint",
+  "target": 1203.55,
+  "target_r": 1.0,
+  "target_label": "1R (one times the risk)",
+  "risk_per_share": 9.95,
+  "reward_risk": 1.0,
+  "reward_risk_net": 0.83,
+  "flat_by": "15:10",
+  "charges": {
+    "qty": 100,
+    "at_stop": 89.27,
+    "at_target": 89.84,
+    "breakdown_at_stop": {
+      "brokerage": 40.0,
+      "stt": 29.59,
+      "exchange_txn": 7.3,
+      "sebi": 0.24,
+      "stamp_duty": 3.58,
+      "gst": 8.56,
+      "dp_charge": 0.0,
+      "total": 89.27
+    },
+    "breakdown_at_target": {
+      "brokerage": 40.0,
+      "stt": 30.09,
+      "exchange_txn": 7.36,
+      "sebi": 0.24,
+      "stamp_duty": 3.58,
+      "gst": 8.57,
+      "dp_charge": 0.0,
+      "total": 89.84
+    },
+    "net_reward": 905.16,
+    "net_risk": 1084.27,
+    "reward_risk_net": 0.83,
+    "basis": "a reference position (nse-budget sizes the real one)",
+    "note": "round trip: buy at the entry, sell at the stop or the target"
+  },
+  "stop_detail": "(\u20b91,192.00 + \u20b91,175.30) / 2 = \u20b91,183.65",
+  "created_at": "2026-10-26T04:30:00Z",
+  "note": "A stop is a plan, not a guarantee: a gap or a fast market can fill past it."
+}

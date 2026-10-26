@@ -1,0 +1,10 @@
+{
+  "rules": [
+    {"id": "opening-bell", "type": "opening_bell"},
+    {"id": "reliance-plan-stop", "symbol": "RELIANCE", "type": "stop", "price": 1183.65, "note": "plan stop: opening-range midpoint", "date": "2026-10-26"},
+    {"id": "reliance-plan-target", "symbol": "RELIANCE", "type": "target", "price": 1203.55, "note": "plan target: 1R (one times the risk)", "date": "2026-10-26"},
+    {"id": "reliance-flat-by", "symbol": "RELIANCE", "type": "time", "at": "15:10", "label": "flat by", "before_close": true, "product": "MIS", "date": "2026-10-26"},
+    {"id": "tcs-move-3", "symbol": "TCS", "type": "pct_move", "pct": 3},
+    {"id": "jppower-circuit", "symbol": "JPPOWER", "type": "circuit", "within": 1}
+  ]
+}

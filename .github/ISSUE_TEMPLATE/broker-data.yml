@@ -1,0 +1,21 @@
+name: Broker data
+description: A broker's charge, square-off time, order type or API detail is wrong or missing
+labels: ["broker-data", "good first issue"]
+body:
+  - type: dropdown
+    id: broker
+    attributes:
+      label: Broker
+      options: [Groww, Zerodha, Angel One, ICICIdirect, Upstox, Kotak Neo, HDFC Sky, Dhan, SBI Securities, Motilal Oswal, Other]
+    validations: {required: true}
+  - type: input
+    id: field
+    attributes:
+      label: What is wrong or missing
+      placeholder: "MIS auto square-off for F&O stocks is 15:10, not 15:00"
+    validations: {required: true}
+  - type: input
+    id: source
+    attributes:
+      label: Source (the broker's own page if possible) and the date you read it
+    validations: {required: true}

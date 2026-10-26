@@ -1,0 +1,11 @@
+{
+  "name": "india-trader",
+  "description": "11 Claude skills for trading and investing on NSE and BSE: scanner, news, entry timer, exit planner, 10,000-replay time machine, budget, risk manager, broker tickets for the top 10 Indian brokers (paper by default), alerts, results analyst and bulk/block deal tracker. Charges, circuit bands and the closing auction built in.",
+  "version": "1.1.0",
+  "author": {"name": "Aditya Raj", "url": "https://github.com/Adityaraj0421"},
+  "homepage": "https://github.com/Adityaraj0421/india-trader",
+  "repository": "https://github.com/Adityaraj0421/india-trader",
+  "license": "MIT",
+  "keywords": ["claude-code", "claude-skills", "nse", "bse", "india", "zerodha", "kite", "nifty", "day-trading", "investing", "paper-trading", "backtesting"],
+  "skills": "./"
+}

@@ -1,0 +1,9 @@
+# your trading files: config, orders, portfolio, paper ledger, caches
+nse/
+trader/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

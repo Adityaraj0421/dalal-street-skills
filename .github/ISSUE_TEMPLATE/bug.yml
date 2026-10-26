@@ -1,0 +1,21 @@
+name: Bug
+description: A skill printed something wrong or crashed
+labels: ["bug"]
+body:
+  - type: input
+    id: skill
+    attributes:
+      label: Skill and command
+      placeholder: "/nse-exit: exit.py plan --from nse/entry.json"
+    validations: {required: true}
+  - type: textarea
+    id: output
+    attributes:
+      label: What it printed, and what you expected
+      description: Paste the output. Remove any account numbers, balances you don't want public, or broker IDs.
+    validations: {required: true}
+  - type: input
+    id: env
+    attributes:
+      label: OS and Python version
+      placeholder: "Windows 11, Python 3.12"

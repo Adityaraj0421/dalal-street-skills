@@ -1,0 +1,69 @@
+{
+  "created_by": "nse-budget",
+  "created_at": "2026-10-26T04:15:00Z",
+  "status": "proposed",
+  "paper": true,
+  "note": "Proposals only. Nothing is placed until nse-risk passes each order and you say yes to it in the chat.",
+  "source": "nse/plan.json (RELIANCE orb 2026-10-26)",
+  "orders": [
+    {
+      "id": "RELIANCE-20261026-0945",
+      "symbol": "RELIANCE",
+      "exchange": "NSE",
+      "yahoo": "RELIANCE.NS",
+      "series": "EQ",
+      "product": "MIS",
+      "side": "BUY",
+      "qty": 118,
+      "order_type": "LIMIT",
+      "price": 1196.1,
+      "stop_trigger": 1188.5,
+      "target_price": 1211.3,
+      "broker": "zerodha",
+      "entry": {
+        "variety": "regular",
+        "exchange": "NSE",
+        "tradingsymbol": "RELIANCE",
+        "transaction_type": "BUY",
+        "quantity": 118,
+        "product": "MIS",
+        "order_type": "LIMIT",
+        "price": 1196.1,
+        "validity": "DAY"
+      },
+      "stop": {
+        "variety": "regular",
+        "exchange": "NSE",
+        "tradingsymbol": "RELIANCE",
+        "transaction_type": "SELL",
+        "quantity": 118,
+        "product": "MIS",
+        "order_type": "SL-M",
+        "trigger_price": 1188.5,
+        "validity": "DAY"
+      },
+      "target": {
+        "price": 1211.3,
+        "how": "LIMIT sell placed after the fill (optional, see nse-broker), or an nse-alerts target alert"
+      },
+      "gtt_oco": null,
+      "plan": {
+        "entry": 1196.1,
+        "stop": 1188.5,
+        "target": 1211.3,
+        "r_per_share": 7.6,
+        "setup": "orb",
+        "entry_time": "09:45",
+        "date": "2026-10-26"
+      },
+      "max_loss": 993.82,
+      "charges_at_stop": 97.02,
+      "charges_at_target": 97.78,
+      "reward_risk": 1.71,
+      "margin_needed": 28227.96,
+      "flat_by": "15:07",
+      "why": "opening-range breakout on RELIANCE: 118 shares, bound by your \u20b91,000 max loss per trade (118 x 7.60 + \u20b997.02 charges = \u20b9993.82 at the stop)",
+      "fingerprint": "cc96c39b7dfb85ed"
+    }
+  ]
+}

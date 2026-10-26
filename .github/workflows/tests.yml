@@ -1,0 +1,36 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "30 3 * * 1"   # Mondays 09:00 IST: catch a stale holiday list or data change early
+
+jobs:
+  offline:
+    name: py${{ matrix.python }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+        python: ["3.8", "3.12", "3.13"]
+        exclude:
+          - os: macos-latest
+            python: "3.8"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Offline test suite (network blocked)
+        env:
+          HTTP_PROXY: http://127.0.0.1:9
+          HTTPS_PROXY: http://127.0.0.1:9
+          PYTHONIOENCODING: utf-8
+        run: python -m unittest discover -s tests -p "test_nse_*.py" -v
+      - name: Generated scripts match the shared layer
+        if: matrix.os == 'ubuntu-22.04' && matrix.python == '3.12'
+        run: |
+          python _shared/build/build.py
+          git diff --exit-code -- nse-budget nse-risk nse-broker

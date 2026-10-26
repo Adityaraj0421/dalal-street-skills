@@ -1,0 +1,18 @@
+{
+  "as_of": "2026-10-26T04:58:00Z",
+  "source": "yahoo",
+  "note": "Delayed quotes in rupees for alerts and sizing checks. Your broker's price is the one that fills. detail.fetched is when each price was read.",
+  "prices": {
+    "RELIANCE": 1197.2
+  },
+  "detail": {
+    "RELIANCE": {
+      "prev_close": 1190.0,
+      "time": "2026-10-26T04:57:20Z",
+      "source": "yahoo",
+      "yahoo": "RELIANCE.NS",
+      "exchange": "NSE",
+      "fetched": "2026-10-26T04:58:00Z"
+    }
+  }
+}

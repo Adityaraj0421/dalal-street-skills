@@ -1,0 +1,11 @@
+{
+  "source": "Example: an equal-ish allocation of 5 lakh across five Nifty 50 names (CNC delivery). Edit the weights; they are renormalised to 100.",
+  "as_of": "2026-10-26",
+  "weights": [
+    {"ticker": "RELIANCE", "name": "Reliance Industries", "weight": 25},
+    {"ticker": "HDFCBANK", "name": "HDFC Bank", "weight": 25},
+    {"ticker": "TCS", "name": "Tata Consultancy", "weight": 20},
+    {"ticker": "INFY", "name": "Infosys", "weight": 15},
+    {"ticker": "ITC", "name": "ITC", "weight": 15}
+  ]
+}
