@@ -3,7 +3,7 @@
 **Scan, plan, replay and size every Indian trade before a rupee moves. STT, stamp duty, circuit bands, your broker's square-off and the 3:15 closing auction are all built in.**
 
 [![tests](https://github.com/Adityaraj0421/india-trader/actions/workflows/tests.yml/badge.svg)](https://github.com/Adityaraj0421/india-trader/actions/workflows/tests.yml)
-![522 offline tests](https://img.shields.io/badge/tests-522%20offline-brightgreen)
+![527 offline tests](https://img.shields.io/badge/tests-527%20offline-brightgreen)
 ![python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)
 ![stdlib only](https://img.shields.io/badge/dependencies-none-blue)
 ![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -128,7 +128,7 @@ Full example: [`nse-budget/config.example.json`](nse-budget/config.example.json)
 
 ## Contributing
 
-Good first contributions: confirm a broker's post-auction square-off time, add the 2027 NSE holidays, add a scanner setup, or improve a news tag. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). All 522 tests run offline in about 20 seconds:
+Good first contributions: confirm a broker's post-auction square-off time, add the 2027 NSE holidays, add a scanner setup, or improve a news tag. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). All 527 tests run offline in about 20 seconds:
 
 ```bash
 python -m unittest discover -s tests -p "test_nse_*.py"

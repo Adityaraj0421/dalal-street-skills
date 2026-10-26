@@ -29,9 +29,17 @@ Tool in this folder (standard library Python, no keys):
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/news.py"                         # watchlist + plan + portfolio
-python3 "${CLAUDE_SKILL_DIR}/news.py" --tickers RELIANCE TCS "M&M" --hours 12
+python3 "${CLAUDE_SKILL_DIR}/news.py" RELIANCE TCS "M&M" --hours 12      # or --tickers ...
+python3 "${CLAUDE_SKILL_DIR}/news.py" TCS --links --loose               # print links; show loose matches too
 python3 "${CLAUDE_SKILL_DIR}/news.py" --no-moves --json
 ```
+
+Google News matches loosely, so a headline is shown only when its title names
+one of your stocks (the ticker, any case for tickers of 5+ letters, or the
+company name). The rest are counted as "loosely matched headlines hidden";
+`--loose` shows them. Links are long Google redirects, so they are printed
+only with `--links` (the JSON always has them). "management change" means a
+change (appointed, resigns, steps down, new CEO), not a CEO being quoted.
 
 ## What it reads and writes
 

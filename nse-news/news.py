@@ -469,11 +469,14 @@ KEYWORDS = [
              r"|\b(?:buys?|sells?|picks? up) (?:a )?stake\b|\bjoint venture\b|\bdeal\b"),
     ("block/bulk deal", r"\b(?:block|bulk) deals?\b"),
     ("rating/target", r"\bupgrade[sd]?\b|\bdowngrade[sd]?\b|\btarget price\b|\bprice target\b|\bbrokerage\b"
-                      r"|\boutperform\b|\bunderperform\b|\boverweight\b|\bunderweight\b|\b(?:buy|sell) rating\b"),
+                      r"|\boutperform\b|\bunderperform\b|\boverweight\b|\bunderweight\b|\b(?:buy|sell) rating\b"
+                      r"|\b(?:sets?|raises?|cuts?|hikes?|lowers?)\b[^.]{0,30}\btargets?\b|\btargets? of\b"),
     ("SEBI/regulatory", r"\bSEBI\b|\bshow[- ]cause\b|\bpenalty\b|\bfined?\b|\bCCI\b|\bNCLT\b|\bprobe\b"
                         r"|\binvestigation\b|\binsider trading\b|\bforensic audit\b"),
-    ("management change", r"\bCEO\b|\bCFO\b|\bmanaging director\b|\bMD & CEO\b|\bchairman\b|\bresign"
-                          r"|\bsteps? down\b|\bappoint|\bsuccession\b"),
+    # a change, not any sentence with "CEO" in it (a CEO's views on AI are not a management change)
+    ("management change", r"\bresign|\bsteps? down\b|\bstepping down\b|\bappoint|\bsuccession\b|\bquits?\b"
+                          r"|\b(?:new|interim|incoming|outgoing)\s+(?:CEO|CFO|MD|managing director|chairman)\b"
+                          r"|\b(?:names?|named|elevates?|elevated)\b[^.]{0,40}\b(?:CEO|CFO|MD|chairman)\b"),
     ("fund raise", r"\bQIP\b|\bIPO\b|\bFPO\b|\bOFS\b|\boffer for sale\b|\brights issue\b"
                    r"|\bpreferential (?:issue|allotment)\b|\bfund-?rais|\braises? (?:Rs|₹)|\bNCDs?\b|\bwarrants\b"),
     ("macro/RBI", r"\bRBI\b|\brepo rate\b|\bMPC\b|\binflation\b|\bCPI\b|\bGDP\b|\bFed\b|\bFOMC\b|\bcrude\b"
@@ -747,7 +750,10 @@ def mention_patterns(watch):
     for t, name in watch.items():
         sym = t.split(".")[0]
         alts = [r"\(%s\)" % re.escape(sym), r"\b(?:NSE|BSE)\s*:\s*%s\b" % re.escape(sym)]
-        if len(sym) >= 3:
+        if len(sym) >= 5:
+            # long tickers in any case: the press writes HCLTech, Infosys's INFY stays INFY
+            alts.append(r"(?i:(?<![A-Za-z0-9&])%s(?![A-Za-z0-9&]))" % re.escape(sym))
+        elif len(sym) >= 3:
             alts.append(r"(?<![A-Za-z0-9&])%s(?![A-Za-z0-9&])" % re.escape(sym))
         nm = clean_name(name)
         rx_name = None
@@ -762,11 +768,18 @@ def tag(items, watch):
     pats = mention_patterns(watch)
     for it in items:
         hay = "%s %s" % (it["title"], it.get("summary") or "")
-        touches = {it["ticker"]} if it["ticker"] in watch else set()
+        mentioned = set()
         for t, (rx_t, rx_n) in pats.items():
             if rx_t.search(hay) or (rx_n and rx_n.search(hay)):
-                touches.add(t)
+                mentioned.add(t)
+        touches = set(mentioned)
+        if it["ticker"] in watch:
+            touches.add(it["ticker"])
         it["touches"] = sorted(touches)
+        # Google News matches loosely: a story the search returned for TCS that never names TCS
+        # (an Infosys story, a market wrap) is "loose" and hidden unless --loose.
+        it["mentioned"] = sorted(mentioned)
+        it["loose"] = it["ticker"] in watch and it["ticker"] not in mentioned
         it["tags"] = [label for label, rx in KEYWORDS if re.search(rx, hay, re.I)]
     return items
 
@@ -780,10 +793,12 @@ def dedupe(items):
                            it["time"].date() if it["time"] else "")]
         hit = next((seen[k] for k in keys if k and k in seen), None)
         if hit is not None:
-            for t in it.get("touches", []):
-                if t not in hit["touches"]:
-                    hit["touches"].append(t)
-            hit["touches"].sort()
+            for key in ("touches", "mentioned"):
+                for t in it.get(key, []):
+                    if t not in hit.setdefault(key, []):
+                        hit[key].append(t)
+                hit.get(key, []).sort()
+            hit["loose"] = hit.get("loose", False) and it.get("loose", False)
             continue
         for k in keys:
             if k:
@@ -855,7 +870,7 @@ def render_moves(moves, move_pct=MOVE_PCT):
     return out
 
 
-def render(items, errors, now, moves=None, move_pct=MOVE_PCT):
+def render(items, errors, now, moves=None, move_pct=MOVE_PCT, links=False, hidden_loose=0):
     out = render_moves(moves or [], move_pct)
     if out:
         out.append("")
@@ -868,8 +883,15 @@ def render(items, errors, now, moves=None, move_pct=MOVE_PCT):
         extra = []
         if it["tags"]:
             extra.append("tags: " + ", ".join(it["tags"]))
-        extra.append(it["link"])
-        out.append("      " + "  ".join(extra))
+        if links and it["link"]:
+            extra.append(it["link"])
+        if extra:
+            out.append("      " + "  ".join(extra))
+    if hidden_loose:
+        out.append("(%d loosely matched headline%s hidden: the search returned them but they never name the "
+                   "stock. --loose shows them.)" % (hidden_loose, "" if hidden_loose == 1 else "s"))
+    if items and not links:
+        out.append("Links: --links prints them (long Google News redirects), or search the headline.")
     for e in errors:
         out.append("note: %s" % e)
     out.append("Checked %s. Headlines are leads, not facts; open the story before acting. "
@@ -890,7 +912,11 @@ def _json_ready(items):
 def main(argv=None):
     utf8_stdout()
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("symbols", nargs="*", metavar="TICKER", help="e.g. news.py TCS HCLTECH (same as --tickers)")
     ap.add_argument("--tickers", nargs="*", help="default: watchlist + plan + portfolio")
+    ap.add_argument("--links", action="store_true", help="print each story's link")
+    ap.add_argument("--loose", action="store_true",
+                    help="also show headlines the search returned that never name the stock")
     ap.add_argument("--portfolio", default="nse/portfolio.json")
     ap.add_argument("--watchlist", default="nse/watchlist.json")
     ap.add_argument("--plan", default="nse/plan.json")
@@ -905,6 +931,8 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true", help="do not update the state file")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
+    if args.symbols:
+        args.tickers = list(args.symbols) + list(args.tickers or [])
 
     try:
         if args.tickers:
@@ -929,6 +957,11 @@ def main(argv=None):
     items = collect(fetcher, watch, hours=args.hours, per_ticker=args.per_ticker, errors=errors)
     items = dedupe(tag(items, watch))
     shown = select(items, state, now, hours=args.hours, show_all=args.all)
+    hidden_loose = 0
+    if not args.loose:
+        # hidden: the headline names none of your stocks (it only came back from a loose search)
+        hidden_loose = sum(1 for i in shown if not i.get("mentioned", i["touches"]))
+        shown = [i for i in shown if i.get("mentioned", i["touches"])]
     moves = [] if args.no_moves else collect_moves(fetcher, watch, errors)
     if args.json:
         mv = [dict(m, time=m["time"].isoformat() if m.get("time") else None,
@@ -936,7 +969,7 @@ def main(argv=None):
         print(json.dumps({"checked": now.isoformat(), "moves": mv, "items": _json_ready(shown),
                           "notes": errors, "not_covered": NOT_COVERED}, indent=2, ensure_ascii=False))
     else:
-        sys.stdout.write(render(shown, errors, now, moves, args.move_pct))
+        sys.stdout.write(render(shown, errors, now, moves, args.move_pct, links=args.links, hidden_loose=hidden_loose))
     if not args.dry_run:
         remember(items, state, now)
         folder = os.path.dirname(args.state)

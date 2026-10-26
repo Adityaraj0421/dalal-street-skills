@@ -257,8 +257,9 @@ class Check(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.state = os.path.join(self.tmp.name, "state", "news.json")
         none = os.path.join(self.tmp.name, "none.json")
+        # --loose: these tests predate the loose-match filter and check other things; Filtering tests it
         self.base = ["--offline", DIR, "--state", self.state, "--now", NOW,
-                     "--portfolio", none, "--watchlist", none, "--plan", none]
+                     "--portfolio", none, "--watchlist", none, "--plan", none, "--loose"]
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -309,7 +310,7 @@ class Check(unittest.TestCase):
         self.assertNotIn("vs previous close", out)
 
     def test_tags_and_touches_in_the_output(self):
-        code, out, err = run(["--tickers", "M&M", "--hours", "72", "--no-moves", "--dry-run"] + self.base)
+        code, out, err = run(["--tickers", "M&M", "--hours", "72", "--no-moves", "--dry-run", "--links"] + self.base)
         lines = out.splitlines()
         i = [n for n, l in enumerate(lines) if "Mahindra Finance Q2 Results" in l][0]
         self.assertIn("2026-10-25 13:15 IST  M&M", lines[i])
@@ -428,6 +429,56 @@ class Guards(unittest.TestCase):
             core = fh.read().split("\n")
         end = core.index("    return inr(x, 0)") + 1          # console .. money: what news pastes
         self.assertIn("\n".join(core[11:end]), self.src)
+
+
+class Filtering(unittest.TestCase):
+    """Positional tickers, loosely matched headlines hidden, links on request, tighter tags."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        none = os.path.join(self.tmp.name, "none.json")
+        self.base = ["--offline", DIR, "--state", os.path.join(self.tmp.name, "news.json"), "--now", NOW,
+                     "--portfolio", none, "--watchlist", none, "--plan", none, "--no-moves", "--dry-run",
+                     "--hours", "2400", "--per-ticker", "0"]
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def titles(self, extra):
+        code, out, _ = run(extra + ["--json"] + self.base)
+        return [i["title"] for i in json.loads(out)["items"]]
+
+    def test_positional_tickers_work_like_tickers(self):
+        self.assertEqual(self.titles(["TCS"]), self.titles(["--tickers", "TCS"]))
+
+    def test_headlines_that_never_name_the_stock_are_hidden(self):
+        strict, loose = self.titles(["TCS"]), self.titles(["TCS", "--loose"])
+        self.assertLess(len(strict), len(loose))
+        self.assertNotIn("Indian IT companies see business in policing AI agents", strict)
+        self.assertIn("Indian IT companies see business in policing AI agents", loose)
+        for t in strict:
+            self.assertRegex(t, r"TCS|Tata Consultancy Services")
+
+    def test_the_hidden_count_and_link_hint_are_said(self):
+        code, out, _ = run(["TCS"] + self.base)
+        self.assertRegex(out, r"\(\d+ loosely matched headlines? hidden")
+        self.assertNotIn("news.google.com", out)
+        self.assertIn("--links prints them", out)
+        code, out, _ = run(["TCS", "--links"] + self.base)
+        self.assertIn("news.google.com", out)
+
+    def test_a_ceo_talking_is_not_a_management_change(self):
+        def tags(title):
+            it = [{"title": title, "summary": "", "ticker": "HCLTECH"}]
+            return news.tag(it, {"HCLTECH": "HCL Technologies Limited"})[0]["tags"]
+        self.assertNotIn("management change", tags("AI marks inflection point, future belongs to those who reinvent: HCLTech CEO"))
+        self.assertIn("management change", tags("HCLTech appoints new CFO"))
+        self.assertIn("management change", tags("HCLTech CEO steps down"))
+        self.assertIn("management change", tags("HCLTech names C Vijayakumar as chairman"))
+        self.assertIn("rating/target", tags("HCLTech launches NVIDIA tool: LKP sets INR 1,360 target for HCL Tech stock"))
+        it = news.tag([{"title": "HCLTech CEO on AI", "summary": "", "ticker": "HCLTECH"}],
+                      {"HCLTECH": "HCL Technologies Limited"})[0]
+        self.assertEqual(it["mentioned"], ["HCLTECH"])   # long tickers match in any case
 
 
 if __name__ == "__main__":
