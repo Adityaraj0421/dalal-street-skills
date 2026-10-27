@@ -436,7 +436,8 @@ class RealChain(unittest.TestCase):
                      "--now", self.NOW_REAL]
             with redirect_stdout(io.StringIO()) as sbuf:
                 self.assertEqual(ticket.main(["show"] + targs), 0)
-                self.assertEqual(ticket.main(["approve", "--index", "1", "--reply", "yes"] + targs), 0)
+                self.assertEqual(ticket.main(["approve", "--index", "1", "--reply", "yes", "--prices", self.REAL_PRICES]
+                                             + targs), 0)       # the 1197.20 quote is at the limit: it fills
             with open(pf, encoding="utf-8") as fh:
                 pos = json.load(fh)["positions"][0]
             self.assertEqual((pos["ticker"], pos["product"], pos["flat_by"], pos["stop"]), ("RELIANCE", "MIS", "15:07", 1188.5))
