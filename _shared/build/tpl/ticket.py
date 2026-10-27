@@ -2,9 +2,12 @@
 """Order tickets, the paper ledger and the decision log for nse-broker. Standard library only.
 
 This tool never talks to a broker and never places a real order. Zerodha has
-no paper trading, so in the default PAPER mode it keeps its own ledger:
-a simulated fill at your limit price, the stop and target tracked, P&L net of
-charges, all in nse/state/broker.json and nse/portfolio.json. In LIVE mode it
+no paper trading, so in the default PAPER mode it keeps its own ledger. A
+LIMIT order behaves like a real day order: it fills at the limit price only
+when the market trades at or through it (a fresh quote on approve, or a later
+1-minute bar), otherwise it rests as WORKING until it fills or expires. Then
+the stop and target are tracked, P&L net of charges, all in
+nse/state/broker.json and nse/portfolio.json. In LIVE mode it
 only prints the broker's own order payload (one renderer per broker) for Claude to send through that broker's
 MCP server or API, or a manual ticket, after your yes.
 
@@ -15,16 +18,27 @@ MCP server or API, or a manual ticket, after your yes.
   approve   records your explicit yes for ONE order, with your reply word for
             word. It refuses "yes to all", "sure", "ok", a yes that names a
             different stock or amount, and any order that is not READY.
-            PAPER: also books the simulated fill. LIVE: prints the entry JSON.
+            PAPER: books the simulated fill when the market (--price, or a
+            nse/prices.json quote at most 15 minutes old) shows the limit is
+            marketable; otherwise records the order as WORKING. LIVE: prints
+            the entry JSON.
   decline   records a no.
   result    (live) records what happened after the Allow once / Deny card:
             placed (with the broker's order id and the fill), denied or failed.
   legs      (live) prints the protective orders after the entry filled: the
             SL-M stop for MIS, the GTT OCO for CNC (and the optional target).
   fill      records a fill in nse/portfolio.json (cash, shares, charges, P&L).
-  track     (paper) checks open positions against the stop and the target,
-            from --price, nse/prices.json or Yahoo's 5-minute bars, books the
-            exit that would have happened, and lists MIS positions past flat_by.
+  working   (paper) lists the WORKING limit orders and checks each one: it
+            fills at the limit when the price trades through it (the low of a
+            Yahoo 1-minute bar since the order for a BUY, the high for a SELL;
+            5-minute bars if 1-minute fail), and expires unfilled, with no
+            ledger change, at the MIS entry cut-off (the end of continuous
+            trading minus entry_buffer_min, or no_entries_after if earlier),
+            at the square-off for an MIS exit, or at the close for CNC.
+  track     (paper) does what `working` does, then checks open positions
+            against the stop and the target, from --price, nse/prices.json or
+            Yahoo's 5-minute bars, books the exit that would have happened, and
+            lists MIS positions past flat_by.
   flatten   builds a sell ticket that closes a symbol's open position by
             flat_by. It still goes through nse-risk and your yes.
   log       prints today's decisions and the realised P&L.
@@ -34,6 +48,7 @@ MCP server or API, or a manual ticket, after your yes.
     python3 ticket.py approve --index 1 --reply "yes"
     python3 ticket.py result --index 1 --status placed --broker-id 2610260000123 --filled-qty 118 --filled-price 1196.10
     python3 ticket.py legs --index 1
+    python3 ticket.py working
     python3 ticket.py track --price RELIANCE=1211.5
     python3 ticket.py flatten --symbol RELIANCE --product MIS
     python3 ticket.py log
@@ -310,9 +325,26 @@ def latest(state, fp, today):
     found = None
     for rec in state.get("orders", []):
         if rec.get("fingerprint") == fp and rec_day(rec) == today and rec.get("status") in (
-                "approved", "declined", "placed", "denied", "failed"):
+                "approved", "declined", "placed", "denied", "failed", "working", "expired"):
             found = rec
     return found
+
+
+WORKING_DONE = ("placed", "expired", "failed", "cancelled")
+
+
+def open_working(state):
+    """The paper WORKING orders that have not filled, expired or failed yet (oldest first)."""
+    recs = state.get("orders", [])
+    out = []
+    for i, r in enumerate(recs):
+        if r.get("status") != "working":
+            continue
+        if any(x.get("fingerprint") == r.get("fingerprint") and rec_day(x) == rec_day(r)
+               and x.get("status") in WORKING_DONE for x in recs[i + 1:]):
+            continue
+        out.append(r)
+    return out
 
 
 def risk_verdict(risk, fp, today):
@@ -339,6 +371,9 @@ def status_of(order, risk, state, today):
         st = rec.get("status")
         if st == "approved":
             return False, "APPROVED by you at %s, waiting for the place_order call" % rec.get("at"), rv
+        if st == "working":
+            return False, ("WORKING since %s: the paper limit order rests unfilled until %s IST (ticket.py working)"
+                           % (rec.get("at"), rec.get("expires"))), rv
         return False, "DONE: %s at %s" % (st, rec.get("at")), rv
     return True, "READY: nse-risk PASS, waiting for your yes", rv
 
@@ -352,6 +387,37 @@ def kind_of(order, rv):
 
 def is_paper(cfg):
     return bool(cfg.get("paper", True))
+
+
+def _minus(t, minutes):
+    return (datetime.datetime.combine(datetime.date(2000, 1, 1), t) - datetime.timedelta(minutes=minutes)).time()
+
+
+def working_expiry(day, product, cas, cfg, kind="entry"):
+    """(IST time, why) a WORKING paper limit order placed on `day` expires unfilled, or (None, why) if the
+    market is closed that day. An MIS entry: the entry cut-off nse-risk uses (the end of continuous trading
+    minus entry_buffer_min, or no_entries_after when earlier; 15 minutes before the end in a special session).
+    An MIS exit: the broker's square-off. CNC: the close."""
+    d = datetime.date(*map(int, day.split("-")))
+    s = session(d)
+    if not s:
+        return None, "the market is closed on %s" % day
+    if product != "MIS":
+        return s[1], "the close"
+    if kind != "entry":
+        return squareoff_time(d, cas, cfg)[0], "%s's MIS square-off" % broker_profile(cfg)["name"]
+    cc = continuous_close(d, cas)
+    if day in SPECIAL_SESSIONS:
+        return _minus(cc, 15), "15 minutes before continuous trading ends in today's special session"
+    buf = int(cfg.get("entry_buffer_min") if cfg.get("entry_buffer_min") is not None else 45)
+    cut, why = _minus(cc, buf), "the entry cut-off: continuous trading ends at %s, minus your %d-minute entry buffer" \
+        % (hm(cc), buf)
+    nea = cfg.get("no_entries_after", "14:45")
+    if nea:
+        t = parse_hhmm(nea, "no_entries_after")
+        if t < cut:
+            cut, why = t, "your no_entries_after"
+    return cut, why
 
 # ---------------------------------------------------------------- one ticket renderer per broker
 # The neutral order (side, qty, product, order type, price, trigger) becomes the payload of that broker's order
@@ -587,8 +653,23 @@ def render(order, idx, total, cfg, risk, state, today):
     for w in (rv or {}).get("warnings", []):
         lines.append("  note: " + w)
     if paper:
-        lines.append("  Paper mode: your yes books a simulated fill in the ledger at the limit price. Nothing is")
-        lines.append("  sent to %s. A real limit order might not fill; this ledger assumes it does." % prof["name"])
+        e = entry_of(order)
+        if str(e.get("order_type", "")).upper() == "LIMIT":
+            exp, why = working_expiry(today, product_of(order), (rv or {}).get("cas_stock", True), cfg,
+                                      kind_of(order, rv))
+            lines.append("  Paper mode, nothing is sent to %s. Your yes fills this LIMIT in the ledger at %s only if"
+                         % (prof["name"], _p(e["price"])))
+            lines.append("  the market is at or through it then (--price P, or a nse/prices.json quote at most 15")
+            lines.append("  minutes old). Otherwise it rests as a WORKING order, like a real day order: it fills when")
+            lines.append("  the price trades at the limit (ticket.py working / track), and %s"
+                         % ("expires unfilled at %s IST (%s)." % (hm(exp), why) if exp else
+                            "today it would expire unfilled (%s)." % why))
+        elif str(e.get("order_type", "")).upper() == "SL":
+            lines.append("  Paper mode: your yes books a simulated fill at this SL order's limit price (the trigger is")
+            lines.append("  not simulated). Nothing is sent to %s." % prof["name"])
+        else:
+            lines.append("  Paper mode: your yes books a simulated fill in the ledger at the market (--price P, or a")
+            lines.append("  fresh nse/prices.json quote). Nothing is sent to %s." % prof["name"])
     else:
         kind, route = live_route(prof)
         tool, payload, notes = entry_payload(order, cfg)
@@ -846,32 +927,62 @@ def cmd_show(a):
     return 0 if any_ready else 1
 
 
+QUOTE_MAX_AGE_S = 15 * 60
+
+
+def fresh_quote(pdoc, sym, exchange, now):
+    """The nse/prices.json quote for this symbol if it is at most 15 minutes old, else None."""
+    table = {re.sub(r"\.NS$", "", str(k).upper()): v for k, v in ((pdoc or {}).get("prices") or {}).items()}
+    detail = {re.sub(r"\.NS$", "", str(k).upper()): v for k, v in ((pdoc or {}).get("detail") or {}).items()}
+    qk = sym + ".BO" if str(exchange).upper() == "BSE" else sym        # the key in prices.json
+    p = _f(table.get(qk))
+    if not p:
+        return None
+    d = detail.get(qk) or {}
+    for key in ("time", "fetched"):
+        try:
+            t = datetime.datetime.fromisoformat(str(d.get(key)).replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            continue
+        return p if abs((now - t).total_seconds()) <= QUOTE_MAX_AGE_S else None
+    return None
+
+
+def marketable(side, limit, price):
+    """Would a limit order fill against this price? A BUY at or above the price, a SELL at or below it."""
+    return price <= limit + 1e-9 if side == "buy" else price >= limit - 1e-9
+
+
 def paper_price(order, a, now):
-    """The price a paper order fills at: its limit price, else --price, else a fresh nse/prices.json quote."""
+    """(price, how) a paper order fills at now, or (None, why) for a LIMIT the market is not at.
+
+    The market is --price, else a nse/prices.json quote at most 15 minutes old. A LIMIT fills at its limit
+    price only when that market is at or through it (BUY: at or below the limit, SELL: at or above it);
+    without one, or away from it, it does not fill: the caller records it as WORKING. A MARKET order fills
+    at the market, and needs one."""
     e = entry_of(order)
-    if str(e.get("order_type", "")).upper() in ("LIMIT", "SL") and _f(e.get("price")):
-        return _f(e["price"]), "your limit price"
+    typ = str(e.get("order_type", "MARKET")).upper()
+    quote, src = None, None
     if getattr(a, "price", None):
-        return float(a.price), "the --price you gave"
-    pdoc = read_json(getattr(a, "prices", None), "prices", required=False) or {}
-    sym = symbol_of(order)
-    table = {re.sub(r"\.NS$", "", str(k).upper()): v for k, v in (pdoc.get("prices") or {}).items()}
-    psym = sym + ".BO" if str(e.get("exchange")).upper() == "BSE" else sym
-    p = _f(table.get(psym))
-    detail = {re.sub(r"\.NS$", "", str(k).upper()): v for k, v in (pdoc.get("detail") or {}).items()}
-    if p:
-        d = detail.get(psym) or {}
-        t = None
-        for key in ("time", "fetched"):
-            try:
-                t = datetime.datetime.fromisoformat(str(d.get(key)).replace("Z", "+00:00")).replace(tzinfo=None)
-                break
-            except ValueError:
-                continue
-        if t is not None and abs((now - t).total_seconds()) <= 15 * 60:
-            return p, "the fresh quote in %s" % a.prices
+        quote, src = float(a.price), "the --price you gave"
+    else:
+        pdoc = read_json(getattr(a, "prices", None), "prices", required=False) or {}
+        quote = fresh_quote(pdoc, symbol_of(order), e.get("exchange") or "NSE", now)
+        src = "the fresh quote in %s" % getattr(a, "prices", None) if quote else None
+    if typ == "LIMIT" and _f(e.get("price")):
+        limit, side = _f(e["price"]), side_of(order)
+        if quote is None:
+            return None, "there is no quote at most 15 minutes old to show the market at your limit"
+        if marketable(side, limit, quote):
+            return limit, "your limit price; the market was %s, %s" % (_p(quote), src)
+        return None, "the market is %s (%s), %s your %s limit %s" % (
+            _p(quote), src, "above" if side == "buy" else "below", side.upper(), _p(limit))
+    if typ == "SL" and _f(e.get("price")):
+        return _f(e["price"]), "your limit price"
+    if quote is not None:
+        return quote, src
     raise TicketError("a paper %s order at the market needs a price: pass --price P (or refresh nse/prices.json)"
-                      % str(e.get("order_type", "MARKET")).upper())
+                      % typ)
 
 
 def cmd_approve(a):
@@ -916,28 +1027,19 @@ def cmd_approve(a):
         print("If an MCP card appears, Allow once / Deny. Then: ticket.py result --index %d --status placed|denied|failed"
               % a.index)
         return 0
-    # PAPER: book the simulated fill
+    # PAPER: book the simulated fill, or rest the limit as a working order
     e = entry_of(order)
     sym, side, q, prod = symbol_of(order), side_of(order), qty_of(order), product_of(order)
     extras = None
     if side == "buy":
         extras = {"stop": stop_of(order), "target": target_of(order), "flat_by": order.get("flat_by"),
                   "order_id": order.get("id")}
-    try:
-        res = apply_fill(a.portfolio, cfg, sym, side, q, fill_price, today, prod, e.get("exchange", "NSE"),
-                         extras, strict=True, at=ist_iso(now))
-    except TicketError:
-        state["orders"].append(dict(base, at=ist_iso(now), plain=rec["plain"], status="failed",
-                                    note="paper fill refused (see the message)"))
-        write_json(a.state, state)
-        raise
-    state["orders"].append(dict(base, at=ist_iso(now), plain=rec["plain"], status="placed",
-                                broker_order_id="PAPER-%s-%d" % (today.replace("-", ""), len(state["orders"]) + 1),
-                                note="paper fill"))
-    write_json(a.state, state)
-    log_fill(a.state, now, today, sym, side, q, fill_price, prod, fp, res, "paper")
-    print("PAPER FILL (simulated, nothing sent to Zerodha): %s %s %s at %s (%s), charges %s."
-          % (side.upper(), _num(q), sym, inr(fill_price), how, inr(res["charges"])))
+    if fill_price is None:
+        return book_working(a, cfg, order, base, rec["plain"], now, today, how, extras, rv)
+    res = paper_fill(a.state, a.portfolio, cfg, base, rec["plain"], fill_price, e.get("exchange", "NSE"), extras,
+                     now, today)
+    print("PAPER FILL (simulated, nothing sent to %s): %s %s %s at %s (%s), charges %s."
+          % (broker_profile(cfg)["name"], side.upper(), _num(q), sym, inr(fill_price), how, inr(res["charges"])))
     if res["net"] is not None:
         print("Realised: %s before charges, %s net of charges for the round trip." % (inr(res["gross"], sign=True),
                                                                                     inr(res["net"], sign=True)))
@@ -948,6 +1050,198 @@ def cmd_approve(a):
         if prod == "MIS" and order.get("flat_by"):
             print("Flat by %s IST: ticket.py flatten --symbol %s then closes it." % (order["flat_by"], sym))
     print("Cash in the paper ledger: %s." % inr(res["portfolio"]["cash"]))
+    return 0
+
+
+# ---------------------------------------------------------------- working paper limit orders
+
+BASE_KEYS = ("date", "index", "fingerprint", "symbol", "side", "qty", "product", "kind", "max_loss", "stop")
+
+
+def paper_fill(state_path, portfolio_path, cfg, base, plain_text, price, exchange, extras, now, day, filled_at=None,
+               note="paper fill"):
+    """Book a paper fill: the "placed" record, the ledger (cash must cover it) and the "filled" record.
+    On a refusal it records "failed" and raises."""
+    state = load_state(state_path)
+    sym, side, q, prod = base["symbol"], base["side"], float(base["qty"]), base["product"]
+    try:
+        res = apply_fill(portfolio_path, cfg, sym, side, q, price, day, prod, exchange, extras, strict=True,
+                         at=filled_at or ist_iso(now))
+    except TicketError:
+        state.setdefault("orders", []).append(dict(base, at=ist_iso(now), plain=plain_text, status="failed",
+                                                   note="paper fill refused (see the message)"))
+        write_json(state_path, state)
+        raise
+    placed = dict(base, at=ist_iso(now), plain=plain_text, status="placed",
+                  broker_order_id="PAPER-%s-%d" % (day.replace("-", ""), len(state.setdefault("orders", [])) + 1),
+                  note=note)
+    if filled_at:
+        placed["filled_at"] = filled_at
+    state["orders"].append(placed)
+    write_json(state_path, state)
+    log_fill(state_path, now, day, sym, side, q, price, prod, base.get("fingerprint"), res, "paper")
+    return res
+
+
+def book_working(a, cfg, order, base, plain_text, now, today, why, extras, rv):
+    """The limit is not marketable: record a WORKING order (your yes, the fingerprint, the time), no fill."""
+    e = entry_of(order)
+    cas = (rv or {}).get("cas_stock", True)
+    exp, exp_why = working_expiry(today, base["product"], cas, cfg, base["kind"])
+    limit = _f(e["price"])
+    w = dict(base, at=ist_iso(now), plain=plain_text, status="working", reply=a.reply, limit=limit,
+             exchange=str(e.get("exchange") or "NSE").upper(), yahoo=order.get("yahoo"),
+             expires=hm(exp) if exp else None, expires_why=exp_why, cas_stock=cas, extras=extras,
+             not_filled=why, note="paper limit order resting, not filled")
+    state = load_state(a.state)
+    state.setdefault("orders", []).append(w)
+    now_ist = to_ist(now).replace(second=0, microsecond=0)
+    if exp is None or now_ist.time() >= exp:
+        state["orders"].append(dict(base, at=ist_iso(now), plain=plain_text, status="expired",
+                                    note="paper limit order expired unfilled (%s)" % exp_why))
+        write_json(a.state, state)
+        print("NOT FILLED: %s, and a day order placed now would not rest (%s). Recorded as expired; the ledger "
+              "is unchanged." % (why, exp_why))
+        return 0
+    write_json(a.state, state)
+    side = base["side"]
+    print("PAPER WORKING ORDER (simulated, nothing sent to %s): %s %s %s LIMIT %s is NOT filled: %s."
+          % (broker_profile(cfg)["name"], side.upper(), _num(float(base["qty"])), base["symbol"], _p(limit), why))
+    print("Like a real day order it rests: it fills at %s once the price trades %s it, and expires unfilled at "
+          "%s IST (%s). Nothing is in the ledger yet." % (_p(limit), "at or below" if side == "buy" else "at or above",
+                                                         hm(exp), exp_why))
+    print("Check it with: ticket.py working (or ticket.py track).")
+    return 0
+
+
+def _ist_naive(text):
+    try:
+        return datetime.datetime.fromisoformat(str(text)).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
+def load_bars_files(specs):
+    """--bars SYM=PATH (a saved Yahoo chart JSON) -> {SYM: bars}: the offline path for tests and replays."""
+    out = {}
+    for spec in specs or []:
+        if "=" not in spec:
+            raise TicketError("--bars wants SYM=PATH (a saved Yahoo chart JSON), not %r" % spec)
+        s, path = spec.split("=", 1)
+        out[parse_symbol(s)["tradingsymbol"]] = bars_from_chart(read_json(path, "bars file"))
+    return out
+
+
+def fetch_bars(ysym, rng):
+    """(bars, label) from Yahoo: 1-minute bars, else 5-minute ones; ([], None) if neither answers."""
+    for interval, label in (("1m", "Yahoo 1-minute bars"), ("5m", "Yahoo 5-minute bars")):
+        try:
+            bars = bars_from_chart(json.loads(yahoo_get(chart_path(ysym, rng, interval))))
+        except (IndiaError, ValueError):
+            continue
+        if bars:
+            return bars, label
+    return [], None
+
+
+def check_working(a, cfg, now, today, manual, pdoc, bar_files):
+    """Fill or expire every open WORKING paper order. Returns the lines to print."""
+    state = load_state(a.state)
+    lines = []
+    now_ist = to_ist(now).replace(microsecond=0)
+    for w in open_working(state):
+        sym, side, limit, day = w["symbol"], w["side"], float(w["limit"]), rec_day(w)
+        exch = w.get("exchange") or "NSE"
+        base = {k: w.get(k) for k in BASE_KEYS}
+        placed_at = _ist_naive(w.get("at")) or datetime.datetime.combine(datetime.date(*map(int, day.split("-"))),
+                                                                         datetime.time(0, 0))
+        exp_t = parse_hhmm(w["expires"], "expires") if w.get("expires") else datetime.time(0, 0)
+        exp_dt = datetime.datetime.combine(placed_at.date(), exp_t)
+        live = day == today and now_ist < exp_dt
+        head = "%s %s %s LIMIT %s (%s, since %s)" % (side.upper(), _num(float(w["qty"])), sym, _p(limit),
+                                                    w.get("product"), str(w.get("at"))[11:16])
+        fill_at, src, seen = None, None, None
+        q = manual.get(sym) if live else None
+        if q is not None:
+            src, seen = "your --price %s" % _p(q), q
+            if marketable(side, limit, q):
+                fill_at = now_ist
+        elif live and fresh_quote(pdoc, sym, exch, now) is not None:
+            q = fresh_quote(pdoc, sym, exch, now)
+            src, seen = "the quote %s in %s" % (_p(q), a.prices), q
+            if marketable(side, limit, q):
+                fill_at = now_ist
+        if fill_at is None:
+            if sym in bar_files:
+                bars, label = bar_files[sym], "the bars you gave"
+            elif not a.offline:
+                bars, label = fetch_bars(w.get("yahoo") or (sym + (".BO" if exch == "BSE" else ".NS")),
+                                         "1d" if day == today else "5d")
+            else:
+                bars, label = [], None
+            span = [b for b in bars if placed_at <= b["t"] < exp_dt and b["t"] <= now_ist]
+            if span:
+                src = "%s since the order" % label
+                if side == "buy":
+                    seen = min(b["low"] for b in span)
+                    hit = next((b for b in span if b["low"] <= limit + 1e-9), None)
+                else:
+                    seen = max(b["high"] for b in span)
+                    hit = next((b for b in span if b["high"] >= limit - 1e-9), None)
+                if hit:
+                    fill_at = hit["t"]
+        if fill_at is not None:
+            filled_at = fill_at.replace(second=0).isoformat() + "+05:30"
+            try:
+                res = paper_fill(a.state, a.portfolio, cfg, base, w.get("plain"), limit, exch, w.get("extras"), now,
+                                 day, filled_at, "paper fill of the working limit order")
+            except TicketError as e:
+                lines.append("%s: the price reached the limit (%s) but the paper fill was refused: %s." % (head, src, e))
+                continue
+            lines.append("%s: FILLED at %s at %s IST (%s; the %s was %s). Charges %s, cash now %s."
+                         % (head, inr(limit), filled_at[11:16], src, "low" if side == "buy" else "high",
+                            _p(seen), inr(res["charges"]), inr(res["portfolio"]["cash"])))
+            continue
+        if not live:
+            st = load_state(a.state)
+            st.setdefault("orders", []).append(dict(base, at=ist_iso(now), plain=w.get("plain"), status="expired",
+                                                    note="paper limit order expired unfilled at %s IST (%s)"
+                                                         % (w.get("expires"), w.get("expires_why"))))
+            write_json(a.state, st)
+            lines.append("%s: EXPIRED unfilled at %s IST (%s)%s. The ledger is unchanged."
+                         % (head, w.get("expires"), w.get("expires_why"),
+                            "; the %s was %s (%s)" % ("low" if side == "buy" else "high", _p(seen), src)
+                            if seen is not None else ""))
+            continue
+        lines.append("%s: still WORKING until %s IST, %s." % (
+            head, w.get("expires"),
+            ("the %s was %s (%s)" % ("low" if side == "buy" else "high", _p(seen), src)) if seen is not None
+            else "no price to check against (give --price %s=P, refresh nse/prices.json, or drop --offline)" % sym))
+    return lines
+
+
+def _track_inputs(a):
+    manual = {}
+    for part in (a.price or []):
+        for kv in part.split(","):
+            if "=" in kv:
+                s, v = kv.split("=", 1)
+                manual[parse_symbol(s)["tradingsymbol"]] = float(v)
+    pdoc = read_json(a.prices, "prices", required=False) or {}
+    return manual, pdoc, load_bars_files(getattr(a, "bars", None))
+
+
+def cmd_working(a):
+    cfg = read_json(a.config, "config", required=False) or {}
+    broker_profile(cfg)
+    now, today = _clock(a)
+    load_calendar()
+    if not open_working(load_state(a.state)):
+        print("No working paper orders in %s." % a.state)
+        return 0
+    manual, pdoc, bar_files = _track_inputs(a)
+    for line in check_working(a, cfg, now, today, manual, pdoc, bar_files):
+        print(line)
     return 0
 
 
@@ -1086,52 +1380,33 @@ def cmd_track(a):
     broker_profile(cfg)
     now, today = _clock(a)
     load_calendar()
+    manual, pdoc, bar_files = _track_inputs(a)
+    for line in check_working(a, cfg, now, today, manual, pdoc, bar_files):
+        print(line)
     pf = read_json(a.portfolio, "portfolio", required=False) or {}
-    manual = {}
-    for part in (a.price or []):
-        for kv in part.split(","):
-            if "=" in kv:
-                s, v = kv.split("=", 1)
-                manual[parse_symbol(s)["tradingsymbol"]] = float(v)
-    pdoc = read_json(a.prices, "prices", required=False) or {}
-    quotes = {re.sub(r"\.NS$", "", str(k).upper()): _f(v) for k, v in (pdoc.get("prices") or {}).items()}
-    detail = {re.sub(r"\.NS$", "", str(k).upper()): v for k, v in (pdoc.get("detail") or {}).items()}
     now_ist = to_ist(now)
     positions = [p for p in pf.get("positions", []) if p.get("stop") or p.get("target") or str(p.get("product")) == "MIS"]
     if not positions:
         print("No open positions with a stop or target to track in %s." % a.portfolio)
         return 0
-    state = load_state(a.state)
     hit_any = False
     for pos in list(positions):
         sym, prod = str(pos["ticker"]).upper(), str(pos.get("product") or "CNC").upper()
         exch = pos.get("exchange", "NSE")
-        qk = sym + ".BO" if str(exch).upper() == "BSE" else sym        # the key in prices.json
         res, src = None, None
+        quote = fresh_quote(pdoc, sym, exch, now)
+        after = _ist_naive(pos["opened_at"]) if pos.get("opened_at") else None
         if sym in manual:
             res, src = evaluate_price(pos, manual[sym]), "your --price %s" % _p(manual[sym])
-        elif quotes.get(qk):
-            d = detail.get(qk) or {}
-            qt = None
-            for key in ("time", "fetched"):
-                try:
-                    qt = datetime.datetime.fromisoformat(str(d.get(key)).replace("Z", "+00:00")).replace(tzinfo=None)
-                    break
-                except ValueError:
-                    continue
-            if qt is not None and abs((now - qt).total_seconds()) <= 15 * 60:
-                res, src = evaluate_price(pos, quotes[qk]), "the quote %s in %s" % (_p(quotes[qk]), a.prices)
+        elif quote:
+            res, src = evaluate_price(pos, quote), "the quote %s in %s" % (_p(quote), a.prices)
+        elif sym in bar_files:
+            res, src = evaluate_bars(pos, bar_files[sym], after), "the bars you gave, since the entry"
         if src is None and not a.offline:
             try:
                 doc = json.loads(yahoo_get(chart_path(pos.get("yahoo") or (sym + (".BO" if exch == "BSE" else ".NS")),
                                                       "1d", "5m")))
                 bars = bars_from_chart(doc)
-                after = None
-                if pos.get("opened_at"):
-                    try:
-                        after = datetime.datetime.fromisoformat(pos["opened_at"]).replace(tzinfo=None)
-                    except ValueError:
-                        after = None
                 res, src = evaluate_bars(pos, bars, after), "Yahoo 5-minute bars since the entry"
                 if not bars:
                     src = None
@@ -1292,7 +1567,8 @@ def main(argv=None):
     common(p)
     p.add_argument("--index", type=int, required=True)
     p.add_argument("--reply", required=True, help="the user's reply, word for word")
-    p.add_argument("--price", help="paper fill price for a market order")
+    p.add_argument("--price", help="paper: the market price now, the last traded price (a MARKET order fills at it; a "
+                                   "LIMIT fills at its limit only if this is at or through it, else it is WORKING)")
     p.add_argument("--prices", default="nse/prices.json")
     p = sub.add_parser("decline", help="record a no")
     common(p)
@@ -1325,14 +1601,20 @@ def main(argv=None):
     p.add_argument("--portfolio", default="nse/portfolio.json")
     p.add_argument("--config", default="nse/config.json")
     p.add_argument("--state", default="nse/state/broker.json")
-    p = sub.add_parser("track", help="(paper) check open positions against their stop and target")
-    p.add_argument("--price", action="append", metavar="SYM=P[,SYM=P]", help="a price to check against")
-    p.add_argument("--prices", default="nse/prices.json")
-    p.add_argument("--offline", action="store_true", help="do not fetch Yahoo bars")
-    p.add_argument("--portfolio", default="nse/portfolio.json")
-    p.add_argument("--config", default="nse/config.json")
-    p.add_argument("--state", default="nse/state/broker.json")
-    clock(p)
+    for name, hlp in (("working", "(paper) list the working limit orders: fill them when the price trades through "
+                                  "the limit, expire them at the cut-off"),
+                      ("track", "(paper) fill or expire working orders, then check open positions against their "
+                                "stop and target")):
+        p = sub.add_parser(name, help=hlp)
+        p.add_argument("--price", action="append", metavar="SYM=P[,SYM=P]", help="a price to check against")
+        p.add_argument("--prices", default="nse/prices.json")
+        p.add_argument("--bars", action="append", metavar="SYM=PATH",
+                       help="a saved Yahoo chart JSON to use instead of fetching (offline replays and tests)")
+        p.add_argument("--offline", action="store_true", help="do not fetch Yahoo bars")
+        p.add_argument("--portfolio", default="nse/portfolio.json")
+        p.add_argument("--config", default="nse/config.json")
+        p.add_argument("--state", default="nse/state/broker.json")
+        clock(p)
     p = sub.add_parser("flatten", help="a sell ticket that closes a symbol's position by flat_by")
     p.add_argument("--symbol", required=True)
     p.add_argument("--product", default="MIS", type=lambda s: s.upper(), choices=["MIS", "CNC"])
@@ -1354,7 +1636,7 @@ def main(argv=None):
         return 1
     try:
         return {"show": cmd_show, "approve": cmd_approve, "decline": cmd_decline, "result": cmd_result,
-                "legs": cmd_legs, "fill": cmd_fill, "track": cmd_track, "flatten": cmd_flatten,
+                "legs": cmd_legs, "fill": cmd_fill, "working": cmd_working, "track": cmd_track, "flatten": cmd_flatten,
                 "log": cmd_log}[a.cmd](a)
     except IndiaError as e:
         print("ticket.py: %s" % e, file=sys.stderr)

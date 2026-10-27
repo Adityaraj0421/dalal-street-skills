@@ -995,8 +995,19 @@ def rec_is_entry(rec):
 
 
 def placed_today(state, today):
-    """Orders recorded as placed today by nse-broker."""
-    return [r for r in (state or {}).get("orders", []) if r.get("status") == "placed" and rec_day(r) == today]
+    """Orders recorded as placed today by nse-broker, and paper limit orders still WORKING (a resting order
+    counts like a placed one until it fills, when its "placed" record takes over, or expires)."""
+    rows = [r for r in (state or {}).get("orders", []) if rec_day(r) == today]
+    out = []
+    for i, r in enumerate(rows):
+        if r.get("status") == "placed":
+            out.append(r)
+        elif r.get("status") == "working" and not any(
+                x.get("fingerprint") == r.get("fingerprint") and x.get("status") in ("placed", "expired", "failed",
+                                                                                     "cancelled")
+                for x in rows[i + 1:]):
+            out.append(r)
+    return out
 
 
 def parse_sec_list(text):

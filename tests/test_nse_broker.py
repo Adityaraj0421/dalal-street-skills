@@ -110,7 +110,7 @@ class TicketShape(unittest.TestCase):
         self.assertNotEqual(ticket.fingerprint(dict(o, qty=119)), ticket.fingerprint(o))
 
 
-class Flow(unittest.TestCase):
+class PaperBase(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp()
         self.orders = os.path.join(self.d, "orders.json")
@@ -150,6 +150,8 @@ class Flow(unittest.TestCase):
         with open(self.pf, encoding="utf-8") as fh:
             return json.load(fh)
 
+
+class Flow(PaperBase):
     def test_nothing_is_ready_before_the_risk_check(self):
         code, text, _ = run(self.args("show"))
         self.assertEqual(code, 1)
@@ -177,9 +179,10 @@ class Flow(unittest.TestCase):
         self.assertFalse(os.path.exists(self.state))
         self.assertFalse(os.path.exists(self.pf))
 
-        code, text, _ = run(self.args("approve", "--index", "1", "--reply", "yes"))
+        code, text, _ = run(self.args("approve", "--index", "1", "--reply", "yes", "--price", "1195"))
         self.assertEqual(code, 0, text)
-        self.assertIn("PAPER FILL (simulated, nothing sent to Zerodha): BUY 118 RELIANCE at ₹1,196.10 (your limit price)", text)
+        self.assertIn("PAPER FILL (simulated, nothing sent to Zerodha): BUY 118 RELIANCE at ₹1,196.10 "
+                      "(your limit price; the market was 1195.00, the --price you gave)", text)
         st = self.state_doc()
         self.assertEqual([r["status"] for r in st["orders"]], ["approved", "placed", "filled"])
         appr, plc, fil = st["orders"]
@@ -232,7 +235,7 @@ class Flow(unittest.TestCase):
 
     def test_the_stop_hit_is_a_net_loss_bigger_than_the_gross(self):
         self.run_risk()
-        run(self.args("approve", "--index", "1", "--reply", "yes"))
+        run(self.args("approve", "--index", "1", "--reply", "yes", "--price", "1195"))
         code, text, _ = run(["track", "--price", "RELIANCE=1185", "--portfolio", self.pf, "--config", self.cfg,
                              "--state", self.state, "--now", "2026-10-26 11:30", "--offline"])
         self.assertIn("STOP hit", text)
@@ -244,7 +247,7 @@ class Flow(unittest.TestCase):
 
     def test_flatten_by_the_close_in_paper(self):
         self.run_risk()
-        run(self.args("approve", "--index", "1", "--reply", "yes"))
+        run(self.args("approve", "--index", "1", "--reply", "yes", "--price", "1195"))
         late = "2026-10-26 15:12"
         code, text, _ = run(["track", "--offline", "--price", "RELIANCE=1200", "--portfolio", self.pf,
                              "--config", self.cfg, "--state", self.state, "--now", late])
@@ -265,7 +268,8 @@ class Flow(unittest.TestCase):
             self.assertEqual(json.load(fh)["results"][0]["kind"], "exit")
         code, text, _ = run(self.args("show", now=late))
         self.assertIn("READY", text)
-        code, text, _ = run(self.args("approve", "--index", "1", "--reply", "yes sell 118 RELIANCE", now=late))
+        code, text, _ = run(self.args("approve", "--index", "1", "--reply", "yes sell 118 RELIANCE",
+                                      "--price", "1200.5", now=late))
         self.assertEqual(code, 0, text)
         self.assertIn("Realised:", text)
         self.assertEqual(self.pf_doc()["positions"], [])
@@ -286,7 +290,7 @@ class Flow(unittest.TestCase):
 
     def test_a_paper_market_exit_needs_a_price(self):
         self.run_risk()
-        run(self.args("approve", "--index", "1", "--reply", "yes"))
+        run(self.args("approve", "--index", "1", "--reply", "yes", "--price", "1195"))
         run(["flatten", "--symbol", "RELIANCE", "--orders", self.orders, "--portfolio", self.pf,
              "--config", self.cfg, "--now", "2026-10-26 15:00"])
         self.run_risk(now="2026-10-26 15:00")
@@ -444,6 +448,149 @@ class Flow(unittest.TestCase):
         self.assertEqual(j["tool_input"], KITE_CALL)
         self.assertEqual(j["fingerprint"], ticket.fingerprint(reliance()))
 
+
+def chart(bars):
+    """A Yahoo chart document from [(hh, mm, open, high, low, close)] on 2026-10-26 (IST)."""
+    ts = [int((datetime.datetime(2026, 10, 26, b[0], b[1]) - datetime.timedelta(hours=5, minutes=30))
+              .replace(tzinfo=datetime.timezone.utc).timestamp()) for b in bars]
+    cols = list(zip(*[b[2:] for b in bars]))
+    return {"chart": {"result": [{"meta": {"symbol": "RELIANCE.NS", "gmtoffset": 19800}, "timestamp": ts,
+                                  "indicators": {"quote": [{"open": list(cols[0]), "high": list(cols[1]),
+                                                            "low": list(cols[2]), "close": list(cols[3])}]}}]}}
+
+
+class WorkingOrders(PaperBase):
+    """A paper LIMIT behaves like a real day order: it fills only when the market is at or through it."""
+
+    def quote(self, price, at_utc):
+        path = os.path.join(self.d, "prices.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"prices": {"RELIANCE": price}, "detail": {"RELIANCE": {"time": at_utc}}}, fh)
+        return path
+
+    def bars(self, rows):
+        path = os.path.join(self.d, "bars.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(chart(rows), fh)
+        return path
+
+    def working(self, now, *extra):
+        return run(["working", "--offline", "--portfolio", self.pf, "--config", self.cfg, "--state", self.state,
+                    "--prices", self.none, "--now", now] + list(extra))
+
+    def approve_away_from_the_market(self):
+        self.assertEqual(self.run_risk(), 0)
+        prices = self.quote(1199.4, "2026-10-26T04:12:00Z")             # 09:42 IST, above the 1196.10 buy limit
+        code, text, _ = run(self.args("approve", "--index", "1", "--reply", "yes RELIANCE", "--prices", prices))
+        self.assertEqual(code, 0, text)
+        return text
+
+    def test_a_marketable_limit_fills_at_the_limit(self):
+        self.assertEqual(self.run_risk(), 0)
+        prices = self.quote(1194.8, "2026-10-26T04:10:00Z")             # 09:40 IST: fresh, below the buy limit
+        code, text, _ = run(self.args("approve", "--index", "1", "--reply", "yes", "--prices", prices))
+        self.assertEqual(code, 0, text)
+        self.assertIn("BUY 118 RELIANCE at ₹1,196.10 (your limit price; the market was 1194.80, the fresh quote", text)
+        self.assertEqual([r["status"] for r in self.state_doc()["orders"]], ["approved", "placed", "filled"])
+        self.assertEqual(self.pf_doc()["positions"][0]["shares"], 118)
+        self.assertTrue(ticket.marketable("buy", 1196.1, 1196.1))
+        self.assertTrue(ticket.marketable("sell", 1200, 1200.5))
+        self.assertFalse(ticket.marketable("sell", 1200, 1199.95))
+
+    def test_a_stale_quote_does_not_fill(self):
+        self.assertEqual(self.run_risk(), 0)
+        prices = self.quote(1190.0, "2026-10-26T03:50:00Z")             # 09:20 IST: 25 minutes old
+        code, text, _ = run(self.args("approve", "--index", "1", "--reply", "yes", "--prices", prices))
+        self.assertEqual(code, 0, text)
+        self.assertIn("NOT filled: there is no quote at most 15 minutes old", text)
+        self.assertFalse(os.path.exists(self.pf))
+
+    def test_a_limit_away_from_the_market_is_working_not_filled(self):
+        self.assertEqual(self.run_risk(), 0)
+        code, text, _ = run(self.args("show", "--index", "1"))
+        self.assertNotIn("this ledger assumes it does", text)
+        self.assertIn("only if\n  the market is at or through it", text)
+        self.assertIn("expires unfilled at 14:30 IST (the entry cut-off", text)
+        text = self.approve_away_from_the_market()
+        self.assertIn("PAPER WORKING ORDER (simulated, nothing sent to Zerodha): BUY 118 RELIANCE LIMIT 1196.10 is "
+                      "NOT filled: the market is 1199.40 (the fresh quote", text)
+        self.assertIn("above your BUY limit 1196.10", text)
+        self.assertFalse(os.path.exists(self.pf))                         # nothing in the ledger
+        st = self.state_doc()["orders"]
+        self.assertEqual([r["status"] for r in st], ["approved", "working"])
+        w = st[1]
+        self.assertEqual((w["reply"], w["fingerprint"], w["at"], w["limit"], w["expires"], w["cas_stock"]),
+                         ("yes RELIANCE", ticket.fingerprint(reliance()), "2026-10-26T09:45:00+05:30", 1196.1,
+                          "14:30", True))
+        code, text, _ = run(self.args("show", "--index", "1"))
+        self.assertIn("WORKING since 2026-10-26T09:45:00+05:30", text)
+        code, _, err = run(self.args("approve", "--index", "1", "--reply", "yes"))
+        self.assertEqual(code, 1)
+        self.assertIn("WORKING since", err)
+        # nse-risk counts the resting order like a placed one
+        res = check.check([reliance()], {"budget": 200000}, state=self.state_doc(),
+                          now=check.parse_now("2026-10-26 10:00"))
+        self.assertEqual(res["today"]["mis_entries_placed"], 1)
+        code, text, _ = self.working("2026-10-26 10:00")
+        self.assertIn("BUY 118 RELIANCE LIMIT 1196.10 (MIS, since 09:45): still WORKING until 14:30 IST, no price", text)
+
+    def test_a_working_order_fills_when_a_bar_low_reaches_the_limit(self):
+        self.approve_away_from_the_market()
+        bars = self.bars([(9, 40, 1195, 1196, 1190, 1195),                # before the order: does not count
+                          (9, 45, 1199, 1200, 1197.5, 1198), (9, 46, 1198, 1199, 1196.1, 1197),
+                          (9, 47, 1197, 1198, 1193, 1194)])
+        code, text, _ = self.working("2026-10-26 10:00", "--bars", "RELIANCE=" + bars)
+        self.assertEqual(code, 0, text)
+        self.assertIn("FILLED at ₹1,196.10 at 09:46 IST (the bars you gave since the order; the low was 1193.00)", text)
+        st = self.state_doc()["orders"]
+        self.assertEqual([r["status"] for r in st], ["approved", "working", "placed", "filled"])
+        self.assertEqual((st[2]["filled_at"], st[3]["price"], st[3]["fingerprint"]),
+                         ("2026-10-26T09:46:00+05:30", 1196.1, ticket.fingerprint(reliance())))
+        pos = self.pf_doc()["positions"][0]
+        self.assertEqual((pos["shares"], pos["stop"], pos["target"], pos["opened_at"]),
+                         (118, 1188.5, 1211.3, "2026-10-26T09:46:00+05:30"))
+        code, text, _ = self.working("2026-10-26 10:05")
+        self.assertIn("No working paper orders", text)
+        res = check.check([reliance()], {"budget": 200000}, state=self.state_doc(),
+                          now=check.parse_now("2026-10-26 10:05"))
+        self.assertEqual(res["today"]["mis_entries_placed"], 1)          # counted once, as placed
+
+    def test_track_fills_a_working_order_then_tracks_the_position(self):
+        self.approve_away_from_the_market()
+        bars = self.bars([(9, 45, 1199, 1200, 1194, 1195), (9, 50, 1195, 1196, 1195.5, 1196)])
+        code, text, _ = run(["track", "--offline", "--bars", "RELIANCE=" + bars, "--portfolio", self.pf,
+                             "--config", self.cfg, "--state", self.state, "--now", "2026-10-26 09:55"])
+        self.assertIn("FILLED at ₹1,196.10 at 09:45 IST", text)
+        self.assertIn("stop 1188.50 and target 1211.30 not touched (the bars you gave, since the entry)", text)
+
+    def test_a_working_order_expires_at_the_cut_off_with_no_ledger_change(self):
+        self.approve_away_from_the_market()
+        bars = self.bars([(9, 45, 1199, 1201, 1197, 1200), (14, 30, 1199, 1199, 1190, 1191)])   # after the cut-off
+        code, text, _ = self.working("2026-10-26 14:29", "--bars", "RELIANCE=" + bars)
+        self.assertIn("still WORKING until 14:30 IST, the low was 1197.00", text)
+        code, text, _ = self.working("2026-10-26 14:31", "--bars", "RELIANCE=" + bars)
+        self.assertIn("EXPIRED unfilled at 14:30 IST (the entry cut-off: continuous trading ends at 15:15, minus "
+                      "your 45-minute entry buffer); the low was 1197.00", text)
+        self.assertIn("The ledger is unchanged", text)
+        self.assertFalse(os.path.exists(self.pf))
+        st = self.state_doc()["orders"]
+        self.assertEqual([r["status"] for r in st], ["approved", "working", "expired"])
+        code, text, _ = run(self.args("show", "--index", "1", now="2026-10-26 14:31"))
+        self.assertIn("DONE: expired", text)
+        res = check.check([reliance()], {"budget": 200000}, state=self.state_doc(),
+                          now=check.parse_now("2026-10-26 14:31"))
+        self.assertEqual(res["today"]["mis_entries_placed"], 0)
+        code, text, _ = self.working("2026-10-26 14:40")
+        self.assertIn("No working paper orders", text)
+
+    def test_the_expiry_times(self):
+        cfg = {"no_entries_after": "14:45", "entry_buffer_min": 45}
+        self.assertEqual(ticket.working_expiry(TODAY, "MIS", True, cfg)[0], datetime.time(14, 30))
+        self.assertEqual(ticket.working_expiry(TODAY, "MIS", False, cfg)[0], datetime.time(14, 45))
+        t, why = ticket.working_expiry(TODAY, "MIS", False, dict(cfg, no_entries_after="14:00"))
+        self.assertEqual((t, why), (datetime.time(14, 0), "your no_entries_after"))
+        self.assertEqual(ticket.working_expiry(TODAY, "CNC", True, cfg), (datetime.time(15, 30), "the close"))
+        self.assertIsNone(ticket.working_expiry("2026-10-25", "CNC", True, cfg)[0])     # a Sunday
 
 class Ledger(unittest.TestCase):
     def setUp(self):

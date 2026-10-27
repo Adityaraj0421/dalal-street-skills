@@ -7,7 +7,9 @@ description: >-
   without your yes. Shows each order as a plain ticket (entry, stop, target,
   max loss with charges, flat-by time), records your yes word for word, and
   in the default PAPER mode books a simulated fill in its own paper ledger
-  (no Indian broker gives a paper account through its API): stop and target
+  (no Indian broker gives a paper account through its API) only when the
+  market is at or through the limit, else keeps it as a working day order
+  that fills or expires like a real one: stop and target
   tracked, P&L net of charges, in nse/state/broker.json and nse/portfolio.json.
   In LIVE mode it renders the order in the configured broker's own API field
   names (Kite place_order, Groww, SmartAPI, Breeze, Upstox, Neo, DhanHQ,
@@ -44,7 +46,8 @@ Two yeses from the user, one PASS from the rules. No yes, no order.
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/ticket.py" show                      # every ticket, READY or not
 python3 "${CLAUDE_SKILL_DIR}/ticket.py" approve --index 1 --reply "yes"
-python3 "${CLAUDE_SKILL_DIR}/ticket.py" track --price RELIANCE=1211.5   # paper: stop / target check
+python3 "${CLAUDE_SKILL_DIR}/ticket.py" working                   # paper: fill or expire working limit orders
+python3 "${CLAUDE_SKILL_DIR}/ticket.py" track --price RELIANCE=1211.5   # paper: working orders, then stop / target
 python3 "${CLAUDE_SKILL_DIR}/ticket.py" flatten --symbol RELIANCE --product MIS
 python3 "${CLAUDE_SKILL_DIR}/ticket.py" log
 # live mode only:
@@ -66,7 +69,7 @@ and keeps the log in `nse/state/broker.json`. `--now "2026-10-26 09:45"` pins th
 | `nse/state/broker.json` | every yes, no, placed, failed and filled, with each entry's max loss and each exit's net P&L |
 | `nse/portfolio.json` | cash, positions per symbol and product (with margin, stop, target, flat_by) and `closed` trades with gross, charges, net |
 | `nse/plan.json` | the flat-by time for `flatten` |
-| `nse/prices.json` | a fresh quote for a paper market-order fill or `track` |
+| `nse/prices.json` | a fresh quote (at most 15 minutes old) for a paper fill: is the limit marketable, the market-order price, `working` and `track` |
 
 ## Brokers: one profile each
 
@@ -136,13 +139,26 @@ The framework text came from secondary sources; read the broker's own page and S
 
 ## Paper mode (the default)
 
-Zerodha has no paper trading, so the ledger is ours. `approve` after a valid yes:
+Zerodha has no paper trading, so the ledger is ours. A paper LIMIT behaves like a real day order. `approve` after a valid yes:
 
-1. books a simulated fill **at your limit price** (an honest limit: a real limit order might not fill, the ledger assumes it does);
-2. takes the margin (MIS: value / leverage; CNC: the full value) and the buy-side charges out of the ledger cash;
-3. keeps the stop, target and flat_by on the position, so `track` can follow them.
+1. looks at the market: `--price P` (the last traded price, never the limit itself) or a `nse/prices.json` quote at most
+   15 minutes old. If the limit is **marketable** (BUY: the market at or below the limit; SELL: at or above it), it books a
+   simulated fill **at the limit price**;
+2. otherwise (the market is away from the limit, or there is no fresh quote) it records the order as **WORKING** in
+   `nse/state/broker.json`, with the yes word for word, the fingerprint and the time, and books nothing. Example: a BUY
+   LIMIT at 3142.10 with the market at 3164.90 is working, not filled;
+3. on a fill, takes the margin (MIS: value / leverage; CNC: the full value) and the buy-side charges out of the ledger cash,
+   and keeps the stop, target and flat_by on the position, so `track` can follow them.
 
-`track` checks the open positions against `--price SYM=P`, a fresh quote in `nse/prices.json`, or (unless `--offline`)
+`ticket.py working` lists the working orders and checks each one; `track` does the same first. A working order fills at its
+limit when the price trades through it: `--price SYM=P` or a fresh quote, else (unless `--offline`) the low (BUY) or high
+(SELL) of Yahoo's 1-minute bars since the order time (5-minute bars if 1-minute fail; `--bars SYM=PATH` replays a saved chart
+offline). It expires unfilled, with no ledger change, at the MIS entry cut-off (the end of continuous trading minus
+`entry_buffer_min`, or `no_entries_after` if earlier: 14:30 for an F&O stock with the defaults until 2026-12-06), at the
+broker's square-off for an MIS exit, and at the close for CNC. nse-risk counts a working order like a placed one until it
+fills or expires. Show the user each WORKING, FILLED or EXPIRED line.
+
+`track` then checks the open positions against `--price SYM=P`, a fresh quote in `nse/prices.json`, or (unless `--offline`)
 Yahoo's 5-minute bars since the entry. A bar that touches both stop and target counts as the stop; a bar that
 opens beyond the stop fills at the open, not at the stop. The exit is booked with the charges of both legs, so the
 P&L you see is net of what the government and the broker take. It also lists MIS positions past flat_by or left over
@@ -177,7 +193,9 @@ Going live is the user's own edit of `"paper": false`. Never do it for them.
    If it prints "Not recorded", the reply was not an explicit yes for this
    order (for example "sure", "yes to all", or a yes that names a different
    stock or amount). Ask again. Never turn a reply into a yes yourself.
-4. **Paper**: `approve` already booked the simulated fill. Show the "PAPER FILL" line and the tracked stop and target.
+4. **Paper**: refresh `nse/prices.json` (nse-alerts) first, or pass `--price P` with the last traded price. `approve` then
+   prints "PAPER FILL" (the limit was marketable: show it and the tracked stop and target) or "PAPER WORKING ORDER" (show
+   why it did not fill and when it expires; then run `ticket.py working` as prices move).
    **Live**: only after "Recorded your yes", send exactly the payload that was printed through the route the ticket named (the broker's
    MCP server tool, found in its tool list, or by hand). If Claude's card appears: Allow once or Deny.
 5. **Live**: record what happened: `ticket.py result --index N --status placed --broker-id <id> --filled-qty Q
@@ -187,7 +205,8 @@ Going live is the user's own edit of `"paper": false`. Never do it for them.
 
 ## Steps: while it is open, and out before flat_by
 
-- nse-alerts watches the stop, the target and the flat-by time (`alerts.py add --from-plan`). In paper mode run `ticket.py track` as prices move.
+- nse-alerts watches the stop, the target and the flat-by time (`alerts.py add --from-plan`). In paper mode run `ticket.py track` as prices move
+  (it also fills or expires a working entry).
 - When the stop or target fills in live mode, record it: `ticket.py fill --symbol RELIANCE --side sell --product MIS --qty 118 --price 1211.30`.
 - By `flat_by` (15:07 IST for an F&O stock at Zerodha until 2026-12-06, else 15:10), anything still open gets closed:
   1. Ask the broker how many shares are held (its positions tool or app, read only). In paper mode the ledger knows.
@@ -211,7 +230,9 @@ ORDER 1 of 1, PAPER ledger, no real money, Zerodha
   READY: nse-risk PASS, waiting for your yes
 ```
 
-The user replies "yes". `approve` prints `PAPER FILL (simulated, nothing sent to Zerodha): BUY 118 RELIANCE at ₹1,196.10`.
+The user replies "yes" with RELIANCE at 1195.00. `approve` prints `PAPER FILL (simulated, nothing sent to Zerodha): BUY 118
+RELIANCE at ₹1,196.10 (your limit price; the market was 1195.00, ...)`. Had the market been at 1199.40, it would print
+`PAPER WORKING ORDER ... is NOT filled` and fill later only when a 1-minute bar's low reached 1196.10 before 14:30.
 At 11:30 `track --price RELIANCE=1212` books the target: +₹1,793.60 before charges, +₹1,695.81 net after all charges.
 In live mode the same yes prints the entry JSON for Kite's `place_order`:
 `{"variety": "regular", "exchange": "NSE", "tradingsymbol": "RELIANCE", "transaction_type": "BUY", "quantity": 118,
