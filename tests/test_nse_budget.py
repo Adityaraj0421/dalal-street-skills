@@ -530,9 +530,13 @@ class BrokerProfiles(unittest.TestCase):
         # another broker: Dhan squares off equity at 15:10 -> 15:05
         d = size.size_trade(plan(), cfg(broker="dhan"), today=TODAY, cas_stock=False)
         self.assertEqual((d["flat_by"], d["squareoff"]), ("15:05", "15:10"))
-        # an unverified broker prints the note
+        # Kotak Neo: verified at 15:05 -> flat by 15:00, no unverified note
         k = size.size_trade(plan(), cfg(broker="kotak"), today=TODAY, cas_stock=False)
-        self.assertIn("not verified", k["squareoff_note"])
+        self.assertEqual((k["flat_by"], k["squareoff"]), ("15:00", "15:05"))
+        self.assertIsNone(k["squareoff_note"])
+        # an unverified broker prints the note
+        u = size.size_trade(plan(), cfg(broker="angelone"), today=TODAY, cas_stock=False)
+        self.assertIn("not verified", u["squareoff_note"])
         # CNC has no flat_by
         self.assertIsNone(size.size_trade(plan(), cfg(), today=TODAY, product="CNC")["flat_by"])
 

@@ -490,7 +490,9 @@ BROKERS = {
     "kotak": {
         "name": "Kotak Neo", "rank": 6,
         "brokerage_mis": (0.05, 0.0, 10.0), "brokerage_cnc": (0.2, 0.0, 0.0), "dp_charge": 23.60,
-        "squareoff": dict(UNVERIFIED_SQUAREOFF), "verified": ["brokerage"],
+        # Equity/cash MIS square-off: 3:05 PM for all cash-segment stocks (CAS and others alike).
+        # Source: kotakneo.com support pages, read 2026-10-29.
+        "squareoff": {"cas": "15:05", "other": "15:05"}, "verified": ["brokerage", "squareoff"],
         "stop_mis": "sl_leg", "stop_cnc": "gtt",
         "api": "Neo Trade API (free)", "mcp": "https://neo.kotaksecurities.com/mcp-server/mcp (official, cannot place orders)",
         "paper": False,
