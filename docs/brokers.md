@@ -50,7 +50,7 @@ Legend: BO = bracket order, CO = cover order, GTT = Good Till Triggered (or equi
 | Angel One | min(₹20, 0.1%), min ₹5; ₹0 up to ₹500 in first 30 days [V] | Same as intraday [V] | ₹20 + GST, about ₹23.60 [V] | 3:15 (pre-CAS page) [V] | ROBO (BO) and CO in app [S] | GTT [S] | SmartAPI, free [S] | **No**: community only |
 | ICICIdirect | ₹20 or 0.05%, lower (iValue, ₹299 one-time) [V] | Per base plan [U] | [U] | [U] | BO in iValue [V]; CO [U] | GTT in Breeze API [V] | Breeze API, free [V] | **No**: community only |
 | Upstox | min(₹20, 0.1%) [V] | ₹20/order [V] | ₹20 + GST, about ₹23.60 [V] | CAS 3:10, others 3:25 [S] | CO discontinued 15 Jul 2026 [V]; BO [U] | GTT single/multi with trailing SL [V] | Upstox API, data free; order brokerage per schedule [S] | **Yes**: mcp.upstox.com/mcp, OAuth, **read-only** [V] |
-| Kotak Neo | ₹10 or 0.05%, lower [V] | Trade Free 0.20%; Youth ₹0; Pro 0.10% [V] | [S] ~0.04% min ₹20–27 + GST | 3:20 per support page (may be pre-CAS) [S] | BO and CO [V via API enum] | GTT [S] | Neo Trade API, ₹0 [V] | **Yes**: neo.kotaksecurities.com/mcp-server/mcp, QR login, **no orders** [V] |
+| Kotak Neo | ₹10 or 0.05%, lower [V] | Trade Free 0.20%; Youth ₹0; Pro 0.10% [V] | [S] ~0.04% min ₹20–27 + GST | CAS and others: 3:05 PM (equity cash) [V, kotakneo.com, 2026-10-29] | BO and CO [V via API enum] | GTT [S] | Neo Trade API, ₹0 [V] | **Yes**: neo.kotaksecurities.com/mcp-server/mcp, QR login, **no orders** [V] |
 | HDFC Securities | HDFC Sky: min(₹20, 2.5%) [V] | Same [V] | [U] | [U] | [U] | [U] | HDFC Sky Open API / InvestRight Individual API, free (company claim) [S] | **Yes (HDFC Sky)**: api.hdfcsky.com/mcp, 2FA login; order ability [U] [V] |
 | Dhan | min(₹20, 0.03%) [V] | ₹0 [V] | ₹12.50 + GST, about ₹14.75 [V] | Equity 3:10 [V] | BO/CO as API product types [V] | Forever Order (SINGLE / OCO) [V] | DhanHQ: trading APIs free; data APIs paid [S] | **No**: community only |
 | SBI Securities | ₹20/order (old) [S] | 0.35% (old) [S] | [U] | [U] | [U] | [U] | No public retail API found [U] | **No** |
@@ -267,8 +267,10 @@ Legend: BO = bracket order, CO = cover order, GTT = Good Till Triggered (or equi
 - Auto square-off: **₹50 + GST/order** [S, Kotak support page per search].
 
 **Auto square-off time**
-- **3:20 PM** for cash and equity derivatives [S]: https://kotaksecurities.com/support/what-are-the-auto-square-off-timings-for-open-intraday-positions
-- Other Kotak pages say 3:05, 3:10 or 3:15 PM. It is unclear whether this has been updated for CAS [U].
+- **3:05 PM** for all equity/cash-segment MIS positions (CAS stocks and others alike) [V]: kotakneo.com support pages, read 2026-10-29.
+  Source: https://kotaksecurities.com/support/what-are-the-auto-square-off-timings-for-open-intraday-positions
+- F&O segment: 3:25 PM.
+- Kotak does not publish a separate CAS-stock vs other-stock split for cash equity: 3:05 PM applies to both.
 
 **Order types**
 - BO and CO (API product enums; bracket help page) [V/S]: https://www.kotakneo.com/support/how-can-i-place-a-bracket-order-on-neo-platforms/
@@ -451,7 +453,7 @@ HDFC Securities runs two retail platforms: **HDFC Sky** (discount) and **InvestR
 
 ## 6. Biggest uncertainties
 
-1. **Square-off times after CAS (3 Aug 2026).** Many broker pages are stale. Only Zerodha (3:12/3:25) and Dhan (3:10) were verified on official pages. Kotak, ICICI, HDFC and SBI are unknown or stale.
+1. **Square-off times after CAS (3 Aug 2026).** Many broker pages are stale. Only Zerodha (3:12/3:25), Dhan (3:10) and Kotak Neo (3:05 for equity cash) were verified on official pages. ICICI, HDFC and SBI are unknown or stale.
 2. **HDFC Sky API field names and MCP order capability.** The developer portal is JavaScript-rendered and was not retrieved.
 3. **SBI Securities.** Current charges and whether any retail API exists are both unknown.
 4. **Motilal Oswal.** Intraday brokerage sources conflict, and API cost is unknown.
